@@ -1,5 +1,5 @@
 ---
--   name: pi deployment playbook
+-   name: RPI Deployment Playbook
     hosts: pi4  # all
     any_errors_fatal: false
     gather_facts: true
