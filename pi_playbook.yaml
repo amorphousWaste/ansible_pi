@@ -1,0 +1,855 @@
+---
+-   name: pi deployment playbook
+    hosts: pi4  # all
+    any_errors_fatal: false
+    gather_facts: true
+    vars_files:
+    -   ./private_vars.yaml
+    -   ./vars.yaml
+
+    tasks:
+    -   name: Change hostname for {{ inventory_hostname }}
+        become: true
+        ansible.builtin.copy:
+            dest: /etc/hostname
+            content: "{{ inventory_hostname }}{{ '\n' }}"
+            backup: true
+        register: hostname_changed
+
+    -   name: Update /etc/hosts
+        become: true
+        ansible.builtin.lineinfile:
+            dest: /etc/hosts
+            regexp: '^127\.0\.0\.1'
+            line: "127.0.0.1{{ '\t' }}{{ inventory_hostname }}"
+            backup: true
+            state: present
+        register: hosts_changed
+
+    -   name: Reboot after hosts update
+        become: true
+        ansible.builtin.reboot:
+            test_command: whoami
+        when: |
+            hostname_changed is changed
+            or hosts_changed is changed
+
+    -   name: Set new password pi4
+        become: true
+        ansible.builtin.user:
+            name: "{{ user }}"
+            # Passwords cannot be sent as plaintext, so encrypt it first.
+            # This requires the python library passlib to be installed locally.
+            password: "{{ pass_pi4|password_hash('sha512') }}"
+            update_password: always
+        when: ansible_hostname == 'pi4'
+
+    -   name: Set new password pi0
+        become: true
+        ansible.builtin.user:
+            name: "{{ user }}"
+            password: "{{ pass_pi0|password_hash('sha512') }}"
+            update_password: always
+        when: ansible_hostname == 'pi0'
+
+    -   name: Set new password pihole
+        become: true
+        ansible.builtin.user:
+            name: "{{ user }}"
+            password: "{{ pass_pihole|password_hash('sha512') }}"
+            update_password: always
+        when: ansible_hostname == 'pihole'
+
+    -   name: Update locale generation file (add en_US.UTF-8)
+        become: true
+        ansible.builtin.lineinfile:
+            path: /etc/locale.gen
+            regexp: "^# {{ locale }} UTF-8"
+            state: present
+            line: "{{ locale }} UTF-8"
+
+    -   name: Update locale generation file (remove en_GB.UTF-8)
+        become: true
+        ansible.builtin.lineinfile:
+            path: /etc/locale.gen
+            regexp: "^en_GB.UTF-8 UTF-8"
+            state: present
+            line: "# en_GB.UTF-8 UTF-8"
+
+    -   name: Remove locale archive
+        become: true
+        ansible.builtin.file:
+            path: /usr/lib/locale/locale-archive
+            state: absent
+
+    -   name: Generate locale
+        become: true
+        ansible.builtin.shell:
+            cmd: locale-gen
+        environment:
+            PATH: "/usr/sbin/:{{ ansible_env.PATH }}"
+
+    # -   name: Update locale
+    #     become: true
+    #     ansible.builtin.shell:
+    #         cmd: "update-locale {{ locale }}"
+    #     environment:
+    #         PATH: "/usr/sbin/:{{ ansible_env.PATH }}"
+
+    -   name: Set locale
+        become: true
+        ansible.builtin.shell:
+            cmd: "localectl set-locale \"{{ locale }}\""
+
+    -   name: Set timezone
+        become: true
+        ansible.builtin.shell:
+            cmd: "timedatectl set-timezone {{ timezone }}"
+
+    -   name: Copy path_update file
+        become: true
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/path_update.sh"
+            dest: "/etc/profile.d/path_update.sh"
+
+    -   name: Disable WiFi power management
+        become: true
+        ansible.builtin.blockinfile:
+            path: "{{ rc_local_path }}"
+            block: |
+                # Turn off WiFi power management
+                /sbin/iw wlan0 set power_save off
+            insertbefore: "exit 0"
+            marker: "# {mark} ANSIBLE BLOCK: WiFi Power"
+
+    -   name: Disable HDMI
+        become: true
+        ansible.builtin.blockinfile:
+            path: "{{ rc_local_path }}"
+            block: |
+                # Turn off HDMI to save some power
+                /usr/bin/tvservice -o
+            insertbefore: "exit 0"
+            marker: "# {mark} ANSIBLE BLOCK: HDMI Power"
+
+    -   name: Set ssh_config SendEnv to send nothing
+        become: true
+        ansible.builtin.lineinfile:
+            path: /etc/ssh/ssh_config
+            regexp: "    SendEnv LANG LC_*"
+            line: "#   SendEnv LANG LC_*"
+
+    -   name: Set ssh_config ServerAliveInterval
+        become: true
+        ansible.builtin.lineinfile:
+            path: /etc/ssh/ssh_config
+            insertafter: EOF
+            line: "    ServerAliveInterval 60"
+
+    -   name: Copy sshd_config
+        become: true
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/sshd_config"
+            dest: "/etc/ssh/sshd_config"
+
+    -   name: Restart sshd service
+        become: true
+        ansible.builtin.shell:
+            cmd: systemctl reload sshd.service
+
+    -   name: Create keep WiFi alive cron directory
+        become: true
+        ansible.builtin.file:
+            path: /etc/cron.keep_alive
+            state: directory
+            mode: "0755"
+        when: ansible_hostname != 'pihole'
+
+    -   name: Copy keep_wifi_alive script
+        become: true
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/keep_wifi_alive.sh"
+            dest: "/etc/cron.keep_alive/keep_wifi_alive.sh"
+            mode: "0755"
+        register: copied_keep_alive_script
+        when: ansible_hostname != 'pihole'
+
+    -   name: Set keep_wifi_alive in crontab
+        become: true
+        ansible.builtin.cron:
+            backup: true
+            name: "keep_wifi_alive"
+            job: "/etc/cron.keep_alive/keep_wifi_alive.sh >> /dev/null 2>&1"
+            # job: "/etc/cron.keep_alive/keep_wifi_alive.sh >>{{ home_path }}/wifi.log 2>&1"
+            minute: "*/5"
+        register: keep_alive_crontab_update
+        when: |
+            copied_keep_alive_script is changed
+            and ansible_hostname != 'pihole'
+
+    -   name: Set activity light to heartbeat
+        become: true
+        ansible.builtin.shell:
+            cmd: dtparam act_led_trigger=heartbeat
+
+    -   name: Turn off power light on boot
+        become: true
+        ansible.builtin.blockinfile:
+            path: "{{ rc_local_path }}"
+            block: |
+                # Turn off PWR led (too bright)
+                bash -c 'echo 0 > /sys/class/leds/led1/brightness'
+            insertbefore: "exit 0"
+            marker: "# {mark} ANSIBLE BLOCK: PWR LED Power"
+        when: ansible_hostname == 'pi4'
+
+    # Although this is already in the config.txt file,
+    # that does not seem to enable it completely, so we set this as well.
+    -   name: Enable i2c-dev hardware
+        become: true
+        ansible.builtin.lineinfile:
+            path: /etc/modules
+            line: i2c-dev
+            insertafter: EOF
+
+    -   name: Create home directories
+        ansible.builtin.file:
+            path: "{{ home_path }}/{{ item }}"
+            state: directory
+            mode: "0755"
+        loop: "{{ user_folders }}"
+
+    -   name: motd block
+        block:
+        -   name: Backup original motd
+            ansible.builtin.copy:
+                remote_src: true
+                src: /etc/motd
+                dest: "{{ backup_path }}/motd"
+
+        -   name: Copy new motd
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/motd"
+                dest: /etc/motd
+
+        -   name: Find motd update scripts
+            ansible.builtin.find:
+                paths: "{{ motd_update_scripts }}"
+            register: motd_update_files
+
+        -   name: Backup motd update scripts
+            ansible.builtin.copy:
+                remote_src: true
+                src: "{{ motd_update_scripts }}"
+                dest: "{{ backup_path }}"
+
+        -   name: Delete motd update scripts
+            ansible.builtin.file:
+                state: absent
+                path: "{{ item.path }}"
+            loop: "{{ motd_update_files.files }}"
+        become: true
+
+    -   name: Copy raspi-config script
+        become: true
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/raspi-config.sh"
+            dest: /etc/profile.d/raspi-config.sh
+
+    -   name: Copy fonts
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/.fonts"
+            dest: "{{ home_path }}/.fonts"
+
+    -   name: Copy .bash files
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/bash_files/{{ item }}"
+            dest: "~/{{ item }}"
+        loop: "{{ bash_files }}"
+
+    -   name: Copy .selected_editor file
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/.selected_editor"
+            dest: ~/.selected_editor
+
+    -   name: Update apt packages
+        become: true
+        ansible.builtin.apt:
+            update_cache: true
+            autoremove: true
+            name: "*"
+            state: latest
+            cache_valid_time: 43200  # 12 hour cache
+        register: packages_updated
+
+    -   name: Reboot after apt update
+        become: true
+        ansible.builtin.reboot:
+            test_command: whoami
+        when: packages_updated is changed
+
+    -   name: Install apt packages
+        become: true
+        ansible.builtin.apt:
+            name: "{{ apt_packages }}"
+        register: packages_installed
+
+    -   name: Reboot after apt install
+        become: true
+        ansible.builtin.reboot:
+            test_command: whoami
+        when: packages_installed is changed
+
+    # Install a few packages ahead of the primary pip installs so they are
+    # gaurenteed to be present during the next install task.
+    -   name: Install python3 preinstall packages
+        ansible.builtin.pip:
+            executable: pip3
+            name: "{{ pip_packages_preinstall }}"
+            extra_args: --upgrade
+        environment:
+            PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
+
+    -   name: Install python3 packages
+        ansible.builtin.pip:
+            executable: pip3
+            name: "{{ pip_packages }}"
+            extra_args: --upgrade
+        environment:
+            PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
+
+    -   name: Copy python scripts
+        ansible.builtin.copy:
+            src: "{{ python_files }}"
+            dest: "{{ python_path }}"
+
+    -   name: rustup block
+        block:
+        -   name: Check for rustup
+            ansible.builtin.stat:
+                path: "{{ cargos_path }}/rustup"
+            register: rustup_installed
+
+        -   name: Install rustup  # Used to install rustc and cargo
+            ansible.builtin.shell:
+                cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+            when: not rustup_installed.stat.exists
+
+    -   name: bat block
+        block:
+        -   name: Check for bat package
+            ansible.builtin.stat:
+                path: "{{ cargos_path }}/bat"
+            register: bat_installed
+
+        -   name: Download bat repo
+            ansible.builtin.git:
+                dest: "{{ github_path }}/bat"
+                clone: true
+                repo: "https://github.com/sharkdp/bat.git"
+            register: bat_downloaded
+            when: not bat_installed.stat.exists
+
+        -   name: Install bat
+            ansible.builtin.shell:
+                chdir: "{{ github_path }}/bat"
+                cmd: cargo install --locked bat
+            environment:
+                PATH: "{{ github_path }}/bat:{{ cargos_path }}:{{ ansible_env.PATH }}"
+            when: not bat_installed.stat.exists
+
+        -   name: Check for bat config
+            ansible.builtin.stat:
+                path: "{{ config_path }}/bat/config"
+            register: bat_config
+
+        -   name: Create bat config
+            ansible.builtin.shell:
+                cmd: bat --generate-config-file
+            environment:
+                PATH: "{{ cargos_path }}:{{ ansible_env.PATH }}"
+            when: not bat_config.stat.exists
+
+        -   name: Add bat config properties
+            ansible.builtin.blockinfile:
+                block: |
+                    # Custom config propertied.
+                    --style="numbers,changes,header,grid"
+                    --decorations="always"
+                path: "{{ config_path }}/bat/config"
+                insertafter: EOF
+                marker: "# {mark} ANSIBLE BLOCK: bat"
+
+    -   name: Pi-hole block
+        block:
+        -   name: Download Pi-hole
+            ansible.builtin.git:
+                dest: "{{ github_path }}/pi_hole"
+                clone: true
+                repo: "https://github.com/pi-hole/pi-hole.git"
+                depth: 1
+
+        -   name: Install Pi-hole
+            become: true
+            ansible.builtin.shell:
+                chdir: "{{ github_path }}/pi_hole"
+                cmd: "bash basic-install.sh"
+            register: pihole_installation_output
+
+        # This is needed so we can get the generated password for the admin console.
+        -   name: Print Pi-hole data
+            debug:
+                msg: "{{ pihole_installation_output }}"
+
+        -   name: Check Pi-hole
+            ansible.builtin.shell:
+                cmd: pihole status
+            register: pihole_status
+
+        -   name: Print Pi-hole status
+            debug:
+                msg: "{{ pihole_status.stdout }}"
+
+        -   name: Enable Pi-hole
+            ansible.builtin.shell:
+                cmd: pihole enable
+            when: pihole_status.stdout is search("Pi-hole blocking is disabled")
+        when: ansible_hostname == 'pihole'
+
+    -   name: rez block
+        block:
+        -   name: Check if rez is downloaded
+            ansible.builtin.stat:
+                path: "{{ github_path }}/rez/install.py"
+            register: rez_downloaded
+
+        -   name: Download rez
+            ansible.builtin.git:
+                dest: "{{ github_path }}/rez"
+                clone: true
+                repo: "https://github.com/nerdvegas/rez.git"
+            when: not rez_downloaded.stat.exists
+
+        -   name: Check if rez is installed
+            ansible.builtin.stat:
+                path: "{{ rez_install_dir }}"
+            register: rez_installed
+
+        -   name: Install rez
+            become: true
+            ansible.builtin.shell:
+                cmd: python /home/pi/github/rez/install.py
+            when: not rez_installed.stat.exists
+
+        -   name: Append rez data to bash profile
+            become: true
+            ansible.builtin.blockinfile:
+                block: |
+                    source {{ rez_install_dir }}/completion/complete.sh
+                    export PATH="$PATH:{{ rez_install_dir }}/bin/rez"
+                path: "{{ profile_path }}"
+                insertafter: EOF
+                marker: "# {mark} ANSIBLE BLOCK: rez"
+            register: rez_data_appended
+
+        -   name: Reboot after profile update
+            become: true
+            ansible.builtin.reboot:
+                test_command: whoami
+            when: rez_data_appended is changed
+
+        -   name: Perform rez binds
+            ansible.builtin.shell:
+                cmd: rez-bind platform; rez-bind arch; rez-bind os; rez-bind python
+            environment:
+                PATH: "{{ rez_install_dir }}/bin/rez:{{ ansible_env.PATH }}"
+            when: not rez_installed.stat.exists
+
+    -   name: SmartFan block
+        block:
+        -   name: Check if SmartFan-rpi exists
+            ansible.builtin.stat:
+                path: "{{ github_path }}/SmartFan-rpi"
+            register: smartfan_exists
+
+        -   name: Download SmartFan-rpi repo
+            ansible.builtin.git:
+                dest: "{{ github_path }}/SmartFan-rpi"
+                clone: true
+                repo: "https://github.com/SequentMicrosystems/SmartFan-rpi.git"
+            register: smartfan_downloaded
+            when: not smartfan_exists.stat.exists
+
+        -   name: Install SmartFan-rpi
+            become: true
+            ansible.builtin.shell:
+                chdir: "{{ github_path }}/SmartFan-rpi"
+                cmd: make install
+            environment:
+                PATH: "{{ github_path }}/SmartFan-rpi:/usr/bin/make:{{ ansible_env.PATH }}"
+
+        -   name: Turn off SmartFan light on boot
+            become: true
+            ansible.builtin.blockinfile:
+                path: "{{ rc_local_path }}"
+                block: |
+                    # Turn off the fan LED
+                    fan 0 bwr 0
+                insertbefore: "exit 0"
+                marker: "# {mark} ANSIBLE BLOCK: SmartFan"
+        when: ansible_hostname != 'pi0'
+
+    -   name: micro block
+        block:
+        -   name: Check for micro
+            ansible.builtin.stat:
+                path: /usr/bin/micro
+            register: micro_installed
+
+        -   name: Install micro
+            ansible.builtin.shell:
+                cmd: "curl https://getmic.ro | bash"
+                chdir: "{{ downloads_path }}"
+            register: micro_downloaded
+            when: not micro_installed.stat.exists
+
+        -   name: Move micro binary
+            become: true
+            ansible.builtin.shell:
+                cmd: "mv {{ downloads_path }}/micro /usr/bin/micro"
+            when: micro_downloaded is changed
+
+    -   name: Create or append .inputrc
+        ansible.builtin.blockinfile:
+            block: set completion-ignore-case on
+            path: ~/.inputrc
+            insertafter: EOF
+            create: true
+
+    -   name: Create or append .nanorc
+        ansible.builtin.blockinfile:
+            block: |
+                include /usr/share/nano/*
+                set linenumbers
+            path: ~/.nanorc
+            insertafter: EOF
+            create: true
+
+    -   name: Apache block
+        block:
+        -   name: Create apache group
+            ansible.builtin.group:
+                name: apache
+
+        -   name: Create apache account
+            ansible.builtin.user:
+                name: apache
+                group: apache
+
+        -   name: Run apache as apache user
+            ansible.builtin.lineinfile:
+                path: /etc/apache2/envvars
+                regexp: "export APACHE_RUN_USER=www-data"
+                line: "export APACHE_RUN_USER=apache"
+
+        -   name: Run apache as apache group
+            ansible.builtin.lineinfile:
+                path: /etc/apache2/envvars
+                regexp: "export APACHE_RUN_GROUP=www-data"
+                line: "export APACHE_RUN_GROUP=apache"
+
+        -   name: Copy apache config file
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/apache2.conf"
+                dest: "{{ apache_config_path }}"
+                force: true
+
+        -   name: Copy ssl key
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/ssl_key_example.key"
+                dest: "{{ ssl_path }}"
+                force: true
+        become: true
+        when: ansible_hostname == "pi4"
+
+    -   name: zsh block
+        block:
+        -   name: Check for Oh My Zsh
+            ansible.builtin.stat:
+                path: "{{ oh_my_zsh_path }}"
+            register: oh_my_zsh_installed
+
+        -   name: Install Oh My Zsh
+            ansible.builtin.git:
+                repo: "https://github.com/ohmyzsh/ohmyzsh.git"
+                dest: "{{ oh_my_zsh_path }}"
+            when: not oh_my_zsh_installed.stat.exists
+
+        -   name: Check if .zshrc file exists
+            ansible.builtin.stat:
+                path: "{{ zshrc_path }}"
+            register: zshrc_exists
+
+        -   name: Backup existing .zshrc file
+            ansible.builtin.copy:
+                remote_src: true
+                src: "{{ zshrc_path }}"
+                dest: "{{ backup_path }}/.zshrc"
+                force: true
+            when: zshrc_exists.stat.exists
+
+        -   name: Create new ~/.zshrc
+            ansible.builtin.copy:
+                remote_src: true
+                src: "{{ oh_my_zsh_path }}/templates/zshrc.zsh-template"
+                dest: "{{ zshrc_path }}"
+                force: true
+
+        -   name: Add zhs auto-suggestions
+            ansible.builtin.git:
+                repo: "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+                dest: "{{ oh_my_zsh_path }}/custom/plugins/zsh-syntax-highlighting"
+
+        -   name: Add plugins to zsh
+            ansible.builtin.lineinfile:
+                path: "{{ zshrc_path }}"
+                insertafter: EOF
+                line: "plugins=(git zsh-autosuggestions autojump zsh-syntax-highlighting)"
+
+    # Desktop environment block
+    -   name: Check if there is a desktop environment
+        ansible.builtin.stat:
+            path: /usr/share/xsessions/LXDE.desktop
+        register: desktop_exists
+
+    -   name: Copy panel config file
+        become: true
+        ansible.builtin.copy:
+            src: "{{ setup_files }}/panel"
+            dest: "{{ home_path }}/.config/lxpanel/LXDE-pi/panels/panel"
+        when: desktop_exists.stat.exists
+
+    # metriful sensor block
+    -   name: Download metriful sensor package
+        ansible.builtin.git:
+            dest: "{{ github_path }}/sensor"
+            clone: true
+            repo: "https://github.com/metriful/sensor.git"
+
+    -   name: ngrok block
+        block:
+        -   name: Check for ngrok
+            ansible.builtin.stat:
+                dest: "{{ home_path }}/ngrok"
+            register: ngrok_installed
+
+        -   name: Create ngrok folder
+            ansible.builtin.file:
+                path: "{{ ngrok_path }}"
+                state: directory
+
+        -   name: Unzip ngrok installer
+            ansible.builtin.unarchive:
+                src: "{{ software_files }}/ngrok.zip"
+                dest: "{{ home_path }}/ngrok"
+                remote_src: no
+            when: not ngrok_installed.stat.exists
+
+        -   name: Add auth token
+            ansible.builtin.shell:
+                chdir: "{{ home_path }}/ngrok"
+                cmd:  "./ngrok authtoken {{ ngrok_auth_token }}"
+            when: not ngrok_installed.stat.exists
+        when: ansible_hostname == "pi4"
+
+    -   name: RabbitMQ block
+        block:
+        -   name: Install rabbitmq
+            ansible.builtin.apt:
+                # 2021/05/26: erlang 24 is not available for RPiOS so this is the
+                # highest version that can be installed.
+                name: rabbitmq-server=3.7.8-4
+            register: rabbitmq_server_installed
+
+        -   name: Reboot after rabbitmq server install
+            ansible.builtin.reboot:
+                test_command: whoami
+            when: rabbitmq_server_installed is changed
+
+        -   name: Get rabbitmq users
+            ansible.builtin.shell:
+                cmd: rabbitmqctl list_users
+            register: rabbitmq_users
+
+        -   name: Setup rabbitmq
+            ansible.builtin.shell:
+                cmd: |
+                    rabbitmq-plugins enable rabbitmq_management
+                    rabbitmqctl add_user "{{ rabbitmq_admin_username }}" "{{ rabbitmq_admin_password }}"
+                    rabbitmqctl set_user_tags "{{ rabbitmq_admin_username }}" administrator
+                    rabbitmqctl set_permissions -p / "{{ rabbitmq_admin_username }}" ".*" ".*" ".*"
+            when: not '"admin" in rabbitmq_users.stdout'
+        become: true
+        when: ansible_hostname == "pi4"
+
+    -   name: Personal Git repos block
+        block:
+        -   name: Copy git ssh keys
+            become: true
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/git_ssh_keys/{{ item }}"
+                dest: "{{ ssh_dir }}/{{ item }}"
+            loop: "{{ ssh_files }}"
+
+        -   name: Download Twitch Bot repo
+            ansible.builtin.git:
+                dest: "{{ github_path }}/twitch_bot"
+                clone: true
+                repo: "git@github.com:amorphousWaste/twitch_bot.git"
+
+        -   name: Download Carrot (RabbitMQ Tests) repo
+            ansible.builtin.git:
+                dest: "{{ github_path }}/carrot"
+                clone: true
+                repo: "git@github.com:amorphousWaste/carrot.git"
+
+        -   name: Download Books DB Tutorial repo
+            ansible.builtin.git:
+                dest: "{{ github_path }}/BooksDB"
+                clone: true
+                repo: "git@github.com:amorphousWaste/BooksDB.git"
+
+        -   name: Download Microblog Tutorial repo
+            ansible.builtin.git:
+                dest: "{{ github_path }}/Microblog"
+                clone: true
+                repo: "git@github.com:amorphousWaste/Microblog.git"
+
+    -   name: Jupyter server block
+        block:
+        -   name: Copy Jupyter notebook files
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/jupyter_files/{{ item }}"
+                dest: "{{ jupyter_path }}/{{ item }}"
+            loop:
+                "{{ jupyter_files }}"
+
+        -   name: Copy Jupyter service script
+            become: true
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/jupyter_files/jupyter.service"
+                dest: /etc/systemd/system/jupyter.service
+
+        -   name: Start Jupyter service
+            become: true
+            ansible.builtin.shell:
+                cmd: |
+                    systemctl enable jupyter.service
+                    systemctl daemon-reload
+                    systemctl start jupyter.service
+        when: ansible_hostname == "pi4"
+
+    -   name: RetroPie block
+        block:
+        -   name: Check for retropie.md
+            ansible.builtin.stat:
+                path: ~/retropie.md
+            register: hints_exists
+
+        -   name: Copy retropie.md
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/retropie.md"
+                dest: "{{ home_path }}/documents/retropie.md"
+            when: not hints_exists.stat.exists
+
+        -   name: Check for RetroPie installed
+            ansible.builtin.stat:
+                dest: "{{ retropie_installation_dir }}"
+            register: retropie_installed
+
+        -   name: Download RetroPie
+            ansible.builtin.git:
+                dest: "{{ github_path }}/RetroPie-Setup"
+                clone: true
+                repo: "https://github.com/RetroPie/RetroPie-Setup.git"
+                depth: 1
+            when: not retropie_exists.stat.exists
+
+        -   name: Make RetroPie installer executable
+            become: true
+            ansible.builtin.file:
+                path: "{{ github_path }}/RetroPie-Setup/retropie_packages.sh"
+                mode: a+x
+            when: |
+                retropie_exists.stat.exists
+                and not retropie_installed.stat.exists
+
+        -   name: Install RetroPie
+            become: true
+            ansible.builtin.shell:
+                cmd: "{{ github_path }}/RetroPie-Setup/retropie_packages.sh setup basic_install"
+            when: not retropie_installed.stat.exists
+
+        -   name: Update RetroPie
+            become: true
+            ansible.builtin.shell:
+                cmd: "{{ github_path }}/RetroPie-Setup/retropie_packages.sh setup update_packages"
+            when: retropie_installed.stat.exists
+
+        -   name: Check for RetroPie data mount point
+            ansible.builtin.stat:
+                path: "{{ retropie_mount }}"
+            register: retroPie_mount_exists
+
+        -   name: Make RetroPie mount point
+            become: true
+            ansible.builtin.file:
+                path: "{{ retropie_mount }}"
+            when: retroPie_mount_exists.stat.exists
+
+        -   name: Get RetroPie drive uuid
+            become: true
+            ansible.builtin.shell:
+                cmd: blkid
+            register: drive_list
+
+        # TODO: Parse the output to get the drive UUID from drive_list
+        # NOTE: Nothing below has been finished.
+        # -   name: Update fstab to automount RetroPie data
+        #     become: true
+        #     ansible.builtin.lineinfile:
+        #         path: /etc/fstab
+        #         # TODO: Update this line once the actual UUID variable is known.
+        #         line: "UUID={{ retroPie.UUID }} {{ retropie_mount }} fstype defaults,auto,users,rw,nofail,,x-systemd.device-timeout=5 0 0"
+        #     register: mount
+
+        # TODO: Once drive root is known
+        -   name: Copy updated BIOS files to external storage
+            ansible.builtin.copy:
+                src: "{{ retropie_installation_dir }}"
+                dest: ""
+
+        # TODO: Once drive root is known
+        -   name: Copy updated menu files to external storage
+            ansible.builtin.copy:
+                src: "{{ retropie_installation_dir }}"
+                dest: ""
+
+        -   name: Delete home RetroPie folder
+            ansible.builtin.file:
+                path: "{{ retropie_home }}"
+                state: absent
+
+        # TODO: Once drive root is known
+        -   name: Symlink RetroPie folder
+            ansible.builtin.file:
+                src: ""
+                dest: "{{ retropie_home }}"
+                state: link
+            when: ansible_hostname == "picade"
+        when: ansible_hostname == "picade"
+
+    -   name: Final reboot
+        become: true
+        ansible.builtin.reboot:
+            test_command: whoami

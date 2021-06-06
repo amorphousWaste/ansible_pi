@@ -1,0 +1,141 @@
+---
+locale: en_US.UTF-8
+timezone: America/Vancouver
+
+apt_packages:
+-   apache2
+-   cmake
+-   emacs
+-   exfat-fuse
+-   git
+-   i2c-tools
+-   lsb-release
+-   nodejs
+-   npm
+-   p7zip-full
+-   python-apt
+-   python-fontforge
+-   python-pip
+-   python-setuptools
+-   python3
+-   python3-pip
+-   python3-pyqt5
+-   python3-rpi.gpio
+-   python3-setuptools
+-   python3-smbus
+-   software-properties-common
+-   tree
+-   unzip
+-   uuid-runtime
+-   zsh
+
+pip_packages_preinstall:
+-   setuptools
+-   wheel
+
+pip_packages:
+-   Flask
+-   Pillow
+-   PyYAML
+-   black
+-   cookiecutter
+-   cython
+-   discord
+-   flask-bootstrap
+-   flask-login
+-   flask-mail
+-   flask-moment
+-   flask-restful
+-   flask-sqlalchemy
+-   flask-wtf
+-   gpiozero
+-   irc
+-   ipython
+-   jinja2
+-   jupyterlab
+-   kivy
+-   opentimelineio
+-   pika
+-   pip
+-   pipreqs
+-   psutil
+-   pygount
+-   pyjwt
+-   pylama
+-   pyqtgraph
+-   pyserial
+-   python-dotenv
+-   rabbitmq
+-   radon
+-   requests
+-   setuptools
+-   sqlalchemy
+-   urllib3
+-   wheel
+
+picade_packages:
+-   bchunk
+-   xboxdrv
+
+user_folders:
+-   .backup
+-   .config
+-   .jupyter
+-   desktop
+-   documents
+-   downloads
+-   github
+-   music
+-   notebooks
+-   pictures
+-   public
+-   python
+-   src
+-   templates
+-   videos
+
+bash_files:
+-   .bashrc
+-   .bash_aliases
+-   .bash_colors
+-   .bash_motd
+-   .bash_scripts
+-   .bash_utilities
+
+jupyter_files:
+-   jupyter_notebook_config.py
+-   jupytercert.key
+-   jupytercert.pem
+
+ssh_files:
+-   id_ed25519
+-   id_ed25519.pub
+
+python_files: ./python
+setup_files: ./setup_files
+software_files: ./software
+
+home_path: /home/pi
+
+apache_config_path: /etc/apache2/apache2.conf
+backup_path: "{{ home_path }}/.backup"
+cargos_path: "{{ home_path }}/.cargo/bin"
+config_path: "{{ home_path }}/.config"
+downloads_path: "{{ home_path }}/downloads"
+env_path: /etc/environment
+github_path: "{{ home_path }}/github"
+jupyter_path: "{{ home_path }}/.jupyter"
+motd_update_scripts: /etc/update-motd.d
+ngrok_path: "{{ home_path }}/ngrok"
+oh_my_zsh_path: "{{ home_path }}/.oh-my-zsh"
+pip_packages_path: "{{ home_path }}/.local/lib/python3.7/site-packages"
+profile_path: /etc/profile
+python_path: "{{ home_path }}/python"
+rc_local_path: /etc/rc.local
+retropie_installation_dir: /opt/retropie
+retropie_mount: /media/retroPie
+retropie_home: "{{ home_path }}/RetroPie"
+rez_install_dir: /opt/rez
+ssh_dir: "{{ home_path }}/.ssh"
+ssl_path: /var/www/fake_ssl_key.key
+zshrc_path: "{{ home_path }}/.zshrc"

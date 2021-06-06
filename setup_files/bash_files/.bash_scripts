@@ -1,0 +1,64 @@
+#!/bin/bash
+# Silly functions that serve no real purpose.
+
+source /home/pi/.bash_colors
+
+alias flip=_flip_a_coin
+alias roll=_roll_the_dice
+alias lets_eat=_lets_eat
+
+_flip_a_coin() {
+    # Flip a coin
+    local throw=$[$RANDOM % 2]
+
+    printf $L_YELLOW"⛀"$NONE" Flipping a coin: "
+
+    if [[ $throw == 0 ]]; then
+        local flip_result="Heads"
+    else
+        local flip_result="Tails"
+    fi
+
+    printf $BOLD$L_BLUE$flip_result$NONE"\n"
+}
+
+_roll_the_dice(){
+    # Roll some dice based on standard dice notation
+    # Eg. 2d6 will roll 2 6-sided dice
+    # Eg. 3d10 will roll 3 10-sided dice
+
+    if ! [[ $1 =~ ^[0-9]+d[0-9]+$ ]]; then
+        printf $D_RED"Error"$NONE": "$D_RED"Argument does not match standard dice notation "$NONE"("$D_RED"Eg. 2d6"$NONE")\n"
+        return 1
+    fi
+
+    # Split the notation into a number of dice and type of die
+    local args
+    args=`echo $1 | awk -F'(d)' '{print $1 " " $2}'`
+    local args_array
+    args_array=("$args")
+    local number
+    number=$[args_array[0]]  # Number of dice to roll
+    local type
+    type=$[args_array[1]]  # Type of die (refers to sides; eg. 6, 10, 20)
+    local total
+    total=0  # Total value
+
+    printf "🎲 Rolling "$BOLD$1$NONE": "
+
+    # Roll each die
+    for die in $(seq 1 $number); do
+        # Calculate the random value
+        local throw
+        throw=$[$RANDOM % $type + 1]
+        total=$(($total + $throw))
+        printf $L_BLUE"$throw"$NONE
+        if [[ $die != "$number" ]]; then
+            printf ", "
+        else
+            print "\n"
+        fi
+    done
+
+    printf "Total: $BOLD$L_BLUE$total$NONE\n"
+}

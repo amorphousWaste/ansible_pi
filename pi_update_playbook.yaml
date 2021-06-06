@@ -1,0 +1,139 @@
+---
+-   name: pi update playbook
+    hosts: pi4  # all
+    any_errors_fatal: false
+    vars_files:
+    -   ./private_vars.yaml
+    -   ./vars.yaml
+
+    tasks:
+    -   name: update apt packages
+        become: yes
+        ansible.builtin.apt:
+            update_cache: yes
+            autoremove: yes
+            name: "*"
+            state: latest
+            cache_valid_time: 43200  # 12 hour cache
+        register: packages_updated
+
+    -   name: update python3 packages
+        ansible.builtin.pip:
+            executable: pip3
+            name: "{{ pip_packages }}"
+            extra_args: --upgrade
+        environment:
+            PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
+
+    -   name: update rustup  # Used to install rustc and cargo
+        ansible.builtin.shell:
+            cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+
+    -   name: download bat repo
+        ansible.builtin.git:
+            dest: "{{ github_path }}/bat"
+            clone: yes
+            update: yes
+            repo: "https://github.com/sharkdp/bat.git"
+        register: bat_downloaded
+
+    -   name: install bat
+        ansible.builtin.shell:
+            chdir: "{{ github_path }}/bat"
+            cmd: cargo install --locked bat
+        environment:
+            PATH: "{{ github_path }}/bat:{{ cargos_path }}:{{ ansible_env.PATH }}"
+
+    -   name: download rez
+        ansible.builtin.git:
+            dest: "{{ github_path }}/rez"
+            clone: yes
+            update: yes
+            repo: "https://github.com/nerdvegas/rez.git"
+
+    -   name: install rez
+        ansible.builtin.shell:
+            cmd: python /home/pi/github/rez/install.py
+        become: yes
+
+    -   name: download SmartFan-rpi repo
+        ansible.builtin.git:
+            dest: "{{ github_path }}/SmartFan-rpi"
+            clone: yes
+            update: yes
+            repo: "https://github.com/SequentMicrosystems/SmartFan-rpi.git"
+        register: smartfan_downloaded
+        when: inventory_hostname != 'pi0'
+
+    -   name: install SmartFan-rpi
+        ansible.builtin.shell:
+            chdir: "{{ github_path }}/SmartFan-rpi"
+            cmd: make install
+        become: yes
+        environment:
+            PATH: "{{ github_path }}/SmartFan-rpi:/usr/bin/make:{{ ansible_env.PATH }}"
+        when: inventory_hostname != 'pi0'
+
+    -   name: install micro
+        ansible.builtin.shell:
+            cmd: "curl https://getmic.ro | bash"
+            chdir: "{{ downloads_path }}"
+        register: micro_downloaded
+
+    -   name: move micro binary
+        become: yes
+        ansible.builtin.shell:
+            cmd: "mv {{ downloads_path }}/micro /usr/bin/micro"
+        when: micro_downloaded is changed
+
+    -   name: install Oh My Zsh
+        ansible.builtin.git:
+            repo: https://github.com/robbyrussell/oh-my-zsh
+            dest: "{{ oh_my_zsh_path }}"
+
+    -   name: Check if .zshrc file exists
+        ansible.builtin.stat:
+            path: "{{ zshrc_path }}"
+        register: zshrc_exists
+
+    -   name: download metriful sensor package
+        ansible.builtin.git:
+            dest: "{{ github_path }}/sensor"
+            clone: yes
+            repo: "https://github.com/metriful/sensor.git"
+
+    -   name: check for retropie installed
+        ansible.builtin.stat:
+            dest: "{{ retropie_installation_dir }}"
+        register: retropie_installed
+        when: ansible_hostname == "picade"
+
+    -   name: update retropie
+        become: yes
+        ansible.builtin.shell:
+            cmd: "{{ github_path }}/RetroPie-Setup/retropie_packages.sh setup update_packages"
+        when: |
+            ansible_hostname == "picade"
+            and retropie_installed.stat.exists
+
+    -   name: unzip ngrok installer
+        ansible.builtin.unarchive:
+            src: "{{ software_files }}/ngrok.zip"
+            dest: "{{ home_path }}/ngrok"
+            remote_src: no
+        when: |
+            ansible_hostname == "pi4"
+            and not ngrok_installed.stat.exists
+
+    -   name: add auth token
+        ansible.builtin.shell:
+            chdir: "{{ home_path }}/ngrok"
+            cmd:  "./ngrok authtoken {{ ngrok_auth_token }}"
+        when: |
+            ansible_hostname == "pi4"
+            and not ngrok_installed.stat.exists
+
+    -   name: reboot after update
+        become: yes
+        ansible.builtin.reboot:
+            test_command: whoami

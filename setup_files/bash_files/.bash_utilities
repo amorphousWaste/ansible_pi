@@ -1,0 +1,427 @@
+#!/bin/bash
+
+# Bash utilities
+
+BAR_LENGTH=40
+BAR_BG_COLOR=$DH_GREY
+
+_get_os_version() {
+    # Get the os version
+    local os
+    os=`cat /etc/os-release | awk '{print $1}'`
+    local version
+    version=`cat /etc/os-release | awk '{print $4}'`
+
+    printf "${os}-${version}"
+}
+
+_is_ssh() {
+    # Check if this is an ssh session
+    # Return 1 if this is an ssh session, 0 if not.
+    if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+_get_last_login() {
+    # Get the date and time of the last login
+    local login_data
+    login_data=$(lastlog -u $USER | awk -F'( )+' '{if(NR>1)if(NR<3)print $0}')
+    local login_array
+    read -a login_array <<< $login_data
+
+    # If in an ssh session, there will be an extra component to the array
+    # which is the "from" column, so the array elements will be 1 higher
+    if [ "`_is_ssh`" == 0 ]; then
+        local date_from_array
+        date_from_array="${login_array[2]} ${login_array[3]} ${login_array[4]} ${login_array[7]}"
+    else
+        local date_from_array
+        date_from_array="${login_array[3]} ${login_array[4]} ${login_array[5]} ${login_array[8]}"
+    fi
+
+    local date_string
+    date_string=`date --date="${date_from_array}" +%Y/%m/%d`
+    local time_string
+    time_string=`date --date="${login_array[6]}" +%H:%M%p`
+
+    printf "$date_string - $time_string"
+}
+
+_calculate_uptime() {
+    # Calculate the system uptime (time since last reboot)
+    local uptime
+    uptime=`cut -d "." -f 1 /proc/uptime`
+
+    if [ $uptime -lt 60 ]; then
+        printf "$uptime seconds"
+
+    else
+        local days
+        days=`expr $uptime / 86400`
+        local hours_remaining
+        hours_remaining=`expr $uptime % 86400`
+        local hours
+        hours=`expr $hours_remaining / 3600`
+        local minutes_remaining
+        minutes_remaining=`expr $uptime % 3600`
+        local minutes
+        minutes=`expr $minutes_remaining / 60`
+
+        printf "$days day(s), $hours hour(s), $minutes minute(s)"
+    fi
+}
+
+_get_disk_space_used() {
+    # Get disk space used
+    local usedhr
+    usedhr=`df / -BG | awk '{if(NR>1)print $3}'`
+    printf "${usedhr//G}"
+}
+
+_get_disk_space_total() {
+    # Get total disk space available
+    local totalhr
+    totalhr=`df / -BG | awk '{if(NR>1)print $2}'`
+    printf "${totalhr//G}"
+}
+
+_get_memory_used() {
+    # Get the used memory
+    printf "`free -g | awk -F'( )+' '{if(NR>1)if(NR<3)printf $3}'`"
+}
+
+_get_memory_total() {
+    # Get the total memory available
+    printf "`free -g | awk -F'( )+' '{if(NR>1)if(NR<3)printf $2}'`"
+}
+
+_get_swap_used() {
+    # Get the amount of disk space in swap
+    printf "`free -g | awk -F'( )+' '{if(NR>2)printf $3}'`"
+}
+
+_get_swap_total() {
+    # Get the total swap space available
+    printf "`free -g | awk -F'( )+' '{if(NR>2)printf $2}'`"
+}
+
+_get_temp_space_used() {
+    # Get the amount of used space in the tmp directory
+    # Given the small amount that usually accumulates, this is in KB
+    printf "`du -hc -BK /tmp 2> >(grep -v 'Permission denied') /dev/null | tail -n 1 | awk -F'(K)' '{print $1}'`"
+}
+
+_get_temp_space_total() {
+    # Get max temp space
+    # This is not a real value, just one to use as a warning to clear temp.
+    # The 1000 is based on converting KB to GB.
+    printf "1000"
+}
+
+_draw_seperator() {
+    # Draw a gradient seperator
+    local colors=("$D_GREY" "$L_GREY" "$D_BLUE" "$L_BLUE" "$NONE" "$L_BLUE" "$D_BLUE" "$L_GREY" "$D_GREY")
+    local seperator=""
+
+    # Check if a length argument is given
+    if [[ -z "$1" ]]; then  # If not, use the default
+        local dashes=10
+
+    else  # Otherwise use the given value
+        local dashes=$1
+    fi
+
+    # Print out a segment of each color
+    for color in "${colors[@]}"; do
+        seperator+=$color
+        # Print x dashes where x in either the given or default number
+        # Keeping for reference: printf "--" "-%.0s" $(seq 1 $dashes)
+        # 'seq' cannot be used because it is overridden by the mss bootstrap
+        for (( i=1; i<=$dashes; i++ )); do
+            seperator+="―"
+        done
+    done
+
+    printf $seperator$NONE"\n"
+}
+
+_draw_simple_seperator() {
+    # Draw a simple grey seperator
+    local seperator=""
+
+    # Check if a length argument is given
+    if [[ -z "$1" ]]; then  # If not use the default
+        local length=80
+
+    else  # Otherwise use the given value
+        local length=$1
+    fi
+
+    # Check if a color argument is given
+    if [[ -z "$2" ]]; then  # If not use the default
+        local color=$L_GREY
+
+    else  # Otherwise use the given value
+        local color=$2
+    fi
+
+    seperator+=$color
+    # Print x dashes where x in either the given or default number
+    # 'seq' cannot be used because it is overridden by the mss bootstrap
+    for (( i=1; i<=$length; i++ )); do
+        seperator+="―"
+    done
+
+    printf $seperator$NONE"\n"
+}
+
+_draw_bar() {
+    # Draw an incrementing progress-bar style bar
+    # given the `used`, `total`, and `unit` values
+    local used=$1
+    local total=$2
+    local unit=$3
+
+    if (( $total < 1 )); then total=1; fi
+
+    # Value at which to draw the bar yellow
+    local warning_value
+    warning_value=`awk "BEGIN {print int($BAR_LENGTH-($BAR_LENGTH/5))}"`
+    # Value at which to draw the bar red
+    local error_value
+    error_value=`expr $BAR_LENGTH - 1`
+
+    # Number of blocks to increment the bar
+    local percinc
+    percinc=`awk "BEGIN {print int($used/$total*$BAR_LENGTH)}"`
+
+    if (( $percinc < $warning_value )); then
+        local used_color=$LH_GREEN
+        local cap_color=$L_GREEN
+    elif (( $percinc < $error_value )); then
+        local used_color=$LH_YELLOW
+        local cap_color=$L_YELLOW
+    else
+        local used_color=$LH_RED
+        local cap_color=$L_RED
+    fi
+
+    if (( $percinc > 0 )); then
+        printf $used_color
+        for u in $(seq 1 $(($percinc - 1))); do
+            printf " "
+        done
+        # printf $cap_color$BAR_BG_COLOR"$FADED_BLOBK_S_R"
+        printf $used_color" "
+    fi
+
+    printf $BAR_BG_COLOR
+    for b in $(seq $percinc $(($BAR_LENGTH - 1))); do
+        printf " "
+    done
+
+    # Print out the value after the bar
+    printf "${NONE}|${used}${unit} / ${total}${unit}"
+}
+
+_find_in_array() {
+    # Find a given item in a given array
+    local item=$1
+    shift
+    local array=("$@")
+    local is_found=1
+
+    for element in "${array[@]}"; do
+        if [[ $element == "$item" ]]; then
+            is_found=0
+            break
+        fi
+    done
+
+    # Return 0 if found, 1 if not found
+    echo $is_found
+}
+
+_reload_fonts() {
+    # Reloads the font cache.
+    fc-cache -fv
+}
+
+_prompt_for_decision() {
+    # Prompt the user for a Yes / No answer.
+    local message=$1
+
+    printf $L_YELLOW"$message"$NONE
+    read -p ": " yes_no
+    printf "\n"
+
+    # Convert capitalization to lowercase
+    yes_no=$(echo $yes_no | tr "[A-Z]" "[a-z]")
+
+    echo $yes_no
+}
+
+_print_info(){
+    printf "${D_GREEN}INFO${NONE}:${D_GREEN} ${1}\n"
+}
+
+_print_warning(){
+    printf "${D_YELLOW}WARNING${NONE}:${D_YELLOW} ${1}\n"
+}
+
+_print_error(){
+    printf "${D_RED}ERROR${NONE}:${D_RED} $1\n"
+}
+
+# Use `echo` to print these butons to the console
+_draw_button() {
+    # Draw a "button" in the given color
+
+    local text=$1
+    shift
+
+    # Check if a background color argument is given
+    if [[ -z "$1" ]]; then  # If not use the default
+        local bg_color="$DH_GREEN"
+
+    else  # Otherwise use the given value
+        local bg_color=$1
+    fi
+
+    # Check if a text color argument is given
+    if [[ -z "$2" ]]; then  # If not use the default
+        local text_color="$L_WHITE"
+
+    else  # Otherwise use the given value
+        local text_color=$2
+    fi
+
+    # Check if a text color argument is given
+    if [[ -z "$3" ]]; then  # If not use the default
+        local cap_color="$D_GREEN"
+
+    else  # Otherwise use the given value
+        local cap_color=$3
+    fi
+
+    printf "${cap_color}${bg_color}${text_color}${text}${1}${NONE}${cap_color}${NONE}"
+}
+
+_get_date() {
+    # Get the current date formatted as DD/MM/YYYY
+    printf "`date +%Y/%m/%d`"
+}
+
+_get_time() {
+    # Get the current time formatted as HH:MM:SS AM/PM
+    printf "`date +%r`"
+}
+
+_get_temps() {
+    # Get the temperatures
+    # calculate rough CPU and GPU temperatures:
+    local cpuTempC
+    local cpuTempF
+    local gpuTempC
+    local gpuTempF
+    if [[ -f "/sys/class/thermal/thermal_zone0/temp" ]]; then
+        cpuTempC=$(($(cat /sys/class/thermal/thermal_zone0/temp)/1000)) && cpuTempF=$((cpuTempC*9/5+32))
+    fi
+
+    if [[ -f "/opt/vc/bin/vcgencmd" ]]; then
+        if gpuTempC=$(/opt/vc/bin/vcgencmd measure_temp); then
+            gpuTempC=${gpuTempC:5:2}
+            gpuTempF=$((gpuTempC*9/5+32))
+        else
+            gpuTempC=""
+        fi
+    fi
+
+    printf "CPU: ${cpuTempC}C / ${cpuTempF}F | GPU: ${gpuTempC}C / ${gpuTempF}F"
+}
+
+_update_all() {
+    # Update everything
+
+    sudo apt update
+    sudo apt full-upgrade -y
+    sudo apt autoremove -y
+    pip2 list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  | xargs -n1 pip install -U
+    pip3 list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  | xargs -n1 pip install -U
+}
+
+_get_packages() {
+    # Get the requested rez packages
+    local requests
+    requests=`echo $REZ_REQUEST | awk -F'(~)' '{print $1}' | xargs`
+    local requests_array
+    requests_array=("$requests")
+
+    if [[ ! $requests ]]; then
+        return 0
+    fi
+
+    local packages=$D_GREEN${requests_array[0]}$NONE
+
+    for package in "${requests_array[@]:1}"; do
+        packages+="|\[$D_GREEN\]$package\[$NONE\]"
+    done
+
+    printf ${packages[*]}
+}
+
+_get_git_status() {
+    # Get the git status for the current directory
+
+    local in_git_repo
+    in_git_repo=$(git rev-parse --is-inside-work-tree)
+
+    # Get the current branch
+    if [ $in_git_repo != true ]; then
+        return
+    fi
+
+    local git_branch
+    git_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Check if anything has changed
+    local git_changes
+    git_changes=$(git diff --stat | sed '$!d' | awk -F'( file)' '{print $1}' | sed 's/^ *//g')
+
+    # Check for uncommitted changes
+    if [[ -n "${git_changes// }" ]]; then
+        local git_prompt="${DH_YELLOW}${git_branch}(${git_changes})${NONE}${D_YELLOW}${DH_GREEN}${ARROW_BLOCK_R}${NONE}"
+
+    else
+        local git_prompt="${DH_TEAL}${git_branch}${NONE}${D_TEAL}${DH_GREEN}${ARROW_BLOCK_R}${NONE}"
+    fi
+
+    printf "$git_prompt"
+}
+
+_get_voltage() {
+    # Get voltages and throttling status
+
+    # Good values should be:
+    # core: volt=0.8625V
+    # sdram_c: volt=1.1000V
+    # sdram_i: volt=1.1000V
+    # sdram_p: volt=1.1000V
+    for id in core sdram_c sdram_i sdram_p; do
+        echo -e "$id: $(vcgencmd measure_volts $id)"
+    done
+
+    # Bit   Hex value   Meaning
+    # 0     1           Under-voltage detected
+    # 1     2           Arm frequency capped
+    # 2     4           Currently throttled
+    # 3     8           Soft temperature limit active
+    # 16    10000       Under-voltage has occurred
+    # 17    20000       Arm frequency capping has occurred
+    # 18    40000       Throttling has occurred
+    # 19    80000       Soft temperature limit has occurred
+    vcgencmd get_throttled
+}

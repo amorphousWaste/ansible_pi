@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# New shell MOTD
+
+_create_motd() {
+    # Draw the standard MOTD
+    local units=G  # For GB
+
+    # Draw the MOTD
+    _draw_seperator
+    # printf "$D_GREEN    .~~.   .~~.    ${L_BLUE}OS............: ${NONE}${os_version}\n"
+    printf "$D_GREEN    .~~.   .~~.    ${L_BLUE}OS.............: ${NONE}$(uname -srmo)\n"
+    printf "$D_GREEN   '. \ ' ' / .'   ${L_BLUE}Host...........: ${NONE}`hostname`@`hostname --all-ip-addresses`\n"
+    printf "$D_RED    .~ .~~~..~.    ${L_BLUE}Processes......: ${NONE}$(ps ax | wc -l | tr -d ' ')\n"
+    printf "$D_RED   : .~.'~'.~. :   ${L_BLUE}Last Login.....: ${NONE}"; _get_last_login; printf "\n"
+    printf "$D_RED  ~ (   ) (   ) ~  ${L_BLUE}Uptime.........: ${NONE}"; _calculate_uptime; printf "\n"
+    printf "$D_RED ( : '~'.~.'~' : ) ${L_BLUE}Temperatures...: ${NONE}"; _get_temps; printf "\n"
+    printf "$D_RED  ~ .~ (   ) ~. ~  ${L_BLUE}Disk Space Used: ${NONE}"; _draw_bar "$(_get_disk_space_used)" "$(_get_disk_space_total)" $units; printf "\n"
+    printf "$D_RED   (  : '~' :  )   ${L_BLUE}Swap...........: ${NONE}"; _draw_bar "$(_get_swap_used)" "$(_get_swap_total)" $units; printf "\n"
+    printf "$D_RED    '~ .~~~. ~'    ${L_BLUE}Tmp Space Used.: ${NONE}"; _draw_bar "$(_get_temp_space_used)" "$(_get_temp_space_total)" "K"; printf "\n"
+    printf "$D_RED        '~'        ${L_BLUE}Memory.........: ${NONE}"; _draw_bar "$(_get_memory_used)" "$(_get_memory_total)" $units; printf "\n"
+    _draw_seperator
+}
+
+retropie_welcome() {
+    # For reference
+
+    local upSeconds
+    upSeconds="$(cut -d. -f1 /proc/uptime)"
+    local secs
+    secs=$((upSeconds%60))
+    local mins
+    mins=$((upSeconds/60%60))
+    local hours
+    hours=$((upSeconds/3600%24))
+    local days
+    days=$((upSeconds/86400))
+    local UPTIME
+    UPTIME=$(printf "%d days, %02dh%02dm%02ds" "$days" "$hours" "$mins" "$secs")
+
+    # calculate rough CPU and GPU temperatures:
+    local cpuTempC
+    local cpuTempF
+    local gpuTempC
+    local gpuTempF
+    if [[ -f "/sys/class/thermal/thermal_zone0/temp" ]]; then
+        cpuTempC=$(($(cat /sys/class/thermal/thermal_zone0/temp)/1000)) && cpuTempF=$((cpuTempC*9/5+32))
+    fi
+
+    if [[ -f "/opt/vc/bin/vcgencmd" ]]; then
+        if gpuTempC=$(/opt/vc/bin/vcgencmd measure_temp); then
+            gpuTempC=${gpuTempC:5:2}
+            gpuTempF=$((gpuTempC*9/5+32))
+        else
+            gpuTempC=""
+        fi
+    fi
+
+    local df_out
+    df_out=()
+    local line
+    while read line; do
+        df_out+=("$line")
+    done < <(df -h /)
+
+    echo "
+        .~~.   .~~.    Raspberry Pi: $(uname -srmo)$(tput setaf 1)$(tput setaf 2)
+       '. \ ' ' / .'   $(tput setaf 7)$(date +'%A, %e %B %Y, %r')$(tput setaf 1)
+        .~ .~~~..~.
+       : .~.'~'.~. :   $(tput setaf 3)${df_out[0]}$(tput setaf 1)
+      ~ (   ) (   ) ~  $(tput setaf 7)${df_out[1]}$(tput setaf 1)
+     ( : '~'.~.'~' : ) $(tput setaf 7)Uptime.............: ${UPTIME}$(tput setaf 1)
+      ~ .~ (   ) ~. ~  $(tput setaf 7)Memory.............: $(grep MemFree /proc/meminfo | awk \{'print $2'\})kB (Free) / $(grep MemTotal /proc/meminfo)$(tput setaf 1)
+       (  : '~' :  )   $(tput setaf 7)Running Processes..: $(ps ax | wc -l | tr -d ' ')$(tput setaf 1)
+        '~ .~~~. ~'    $(tput setaf 7)IP Address.........: $(ip route get 8.8.8.8 2>/dev/null | head -1 | cut -d' ' -f7)$(tput setaf 1)
+            '~'        $(tput setaf 7)Temperature........: CPU: $cpuTempC  C/$cpuTempF  F GPU: $gpuTempC  C/$gpuTempF  F$(tput sgr0)
+    "
+}
