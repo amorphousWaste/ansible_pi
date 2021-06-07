@@ -5,13 +5,10 @@ timezone: America/Vancouver
 apt_packages:
 -   apache2
 -   cmake
--   emacs
 -   exfat-fuse
 -   git
 -   i2c-tools
 -   lsb-release
--   nodejs
--   npm
 -   p7zip-full
 -   python-apt
 -   python-fontforge
@@ -54,9 +51,9 @@ pip_packages:
 -   jinja2
 -   jupyterlab
 -   kivy
--   opentimelineio
 -   pika
 -   pip
+-   pipenv
 -   pipreqs
 -   psutil
 -   pygount
@@ -70,7 +67,9 @@ pip_packages:
 -   requests
 -   setuptools
 -   sqlalchemy
+-   twitchio
 -   urllib3
+-   websockets
 -   wheel
 
 picade_packages:
