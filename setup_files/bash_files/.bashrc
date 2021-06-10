@@ -75,6 +75,38 @@ _set_ps1() {
     # For reference, this is for showing the history number: $NONE"["$D_YELLOW"\\!"$NONE"]"
     local exit="$?"
 
+    local none
+    none=`_get_color "NONE"`
+    local user_color
+    user_color=`_get_color "DH_BLUE"`
+    local user_arrow
+    user_arrow=`_get_color "D_BLUE"`
+    local machine_color
+    machine_color=`_get_color "LH_BLUE"`
+    local machine_arrow
+    machine_arrow=`_get_color "L_BLUE"`
+    local dir_arrow_color
+    dir_arrow_color=`_get_color "D_GREEN"`
+    local dir_bg_color
+    dir_bg_color=`_get_color "DH_GREEN"`
+    local dir_text_color
+    dir_text_color=`_get_color "D_GREY"`
+    local date_bg_color
+    date_bg_color=`_get_color "DH_GREY"`
+    local time_bg_color
+    time_bg_color=`_get_color "LH_GREY"`
+    local user_text_color
+    user_text_color=`_get_color "L_GREY"`
+    local red
+    red=`_get_color "D_RED"`
+    local bold
+    bold=`_get_color "BOLD"`
+
+    local arrow_block_r
+    arrow_block_r=`_get_char "ARROW_BLOCK_R"`
+    local arrow_char_r
+    arrow_char_r=`_get_char "ARROW_CHAR_R"`
+
     local prompt
     prompt=""
 
@@ -83,7 +115,7 @@ _set_ps1() {
 
     # Add rez packages
     if [[ $packages ]]; then
-        prompt+="[$packages]\n"
+        prompt+="[${packages}]\n"
     fi
 
     # local git_status
@@ -93,46 +125,41 @@ _set_ps1() {
     # fi
 
     # Add the current directory
-    prompt+="\[$DH_GREEN$D_GREY\]\w\[$NONE$D_GREEN\]$ARROW_BLOCK_R\[$NONE\]\n"
+    prompt+="\[${dir_bg_color}${dir_text_color}\]\w\[${none}${dir_arrow_color}\]${arrow_block_r}\[${none}\]\n"
 
     local current_date
     current_date=`_get_date`
     local current_time
     current_time=`_get_time`
 
-    local user_color=$DH_BLUE
-    local user_arrow=$D_BLUE
-    local machine_color=$LH_BLUE
-    local machine_arrow=$L_BLUE
-
     # Add the date
-    prompt+="\[$DH_GREY\]$current_date\[$NONE$LH_GREY$D_GREY\]$ARROW_BLOCK_R"
+    prompt+="\[${date_bg_color}\]${current_date}\[${none}${time_bg_color}${dir_text_color}\]${arrow_block_r}"
     # Add the time
-    prompt+="\[$NONE$LH_GREY\]$current_time\[$NONE$L_GREY$user_color\]$ARROW_BLOCK_R"
+    prompt+="\[${none}${time_bg_color}\]${current_time}\[${none}${user_text_color}${user_color}\]${arrow_block_r}"
     # Add the user
-    prompt+="\[$NONE$user_color\]\u"
+    prompt+="\[${none}${user_color}\]\u"
     # Add the machine if in an ssh session
     if [ "`_is_ssh`" == 1 ]; then
-        prompt+="\[$NONE$machine_color$user_arrow\]$ARROW_BLOCK_R\[$NONE$machine_color\]\h"
+        prompt+="\[${none}${machine_color}${user_arrow}\]${arrow_block_r}\[${none}${machine_color}\]\h"
     fi
 
     if [[ "`_is_ssh`" == 1 ]]; then
-        prompt+="\[$NONE$machine_arrow\]$ARROW_BLOCK_R\[$NONE\]"
+        prompt+="\[${none}${machine_arrow}\]${arrow_block_r}\[${none}\]"
 
     else
-        prompt+="\[$NONE$user_arrow\]$ARROW_BLOCK_R\[$NONE\]"
+        prompt+="\[${none}${user_arrow}\]${arrow_block_r}\[${none}\]"
     fi
 
     # Use the exit status of the previous command to color the username and
     # machine. Blue for success, red for failure.
     if [[ $exit == 0 ]]; then
-        local exit_color=$D_GREEN
+        local exit_color=$dir_arrow_color
     else
-        local exit_color=$D_RED
+        local exit_color=$red
     fi
 
     # Set the prompt
-    export PS1="$prompt\[$BOLD$exit_color\]$ARROW_CHAR_R\[$NONE\] "
+    export PS1="${prompt}\[${bold}${exit_color}\]${arrow_char_r}\[${none}\] "
 }
 
 _tosw() {
@@ -182,6 +209,11 @@ _goto() {
     local exit_code
     exit_code=0
 
+    local red
+    red=`_get_color "D_RED"`
+    local none
+    none=`_get_color "NONE"`
+
     # If nothing is given, go to the home folder
     if [[ -z $path ]]; then
         dest=""
@@ -218,7 +250,7 @@ _goto() {
         local valid
         valid=${path//$invalid/}
 
-        printf $L_RED"Path Not Found:${NONE} ${valid}${D_RED}${invalid}${NONE}\n"
+        printf $L_RED"Path Not Found:${none} ${valid}${red}${invalid}${none}\n"
         dest=$current
         # Set a non-zero exit code
         exit_code=1
@@ -252,13 +284,18 @@ _rez_build() {
     # Perform a Rez Build and then print out the last time it was built.
     rez-build -ic "$@"
 
+    local blue
+    blue=`_get_color "D_BLUE"`
+    local none
+    none=`_get_color "NONE"`
+
     local date_formatted
     date_formatted=`date +'%Y/%m/%d'`
     local time_formatted
     time_formatted=`date +'%I:%M%p'`
     local date_time
     date_time=`echo "$date_formatted - $time_formatted"`
-    printf "Last built at: ${D_BLUE}${date_time}${NONE}\n\n"
+    printf "Last built at: ${blue}${date_time}${none}\n\n"
 }
 
 # Run the init function

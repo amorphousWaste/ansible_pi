@@ -3,7 +3,7 @@
 # Bash utilities
 
 BAR_LENGTH=40
-BAR_BG_COLOR=$DH_GREY
+BAR_BG_COLOR=`_get_color "DH_GREY"`
 
 _get_os_version() {
     # Get the os version
@@ -123,7 +123,7 @@ _get_temp_space_total() {
 
 _draw_seperator() {
     # Draw a gradient seperator
-    local colors=("$D_GREY" "$L_GREY" "$D_BLUE" "$L_BLUE" "$NONE" "$L_BLUE" "$D_BLUE" "$L_GREY" "$D_GREY")
+    local colors=("D_GREY" "L_GREY" "D_BLUE" "L_BLUE" "NONE" "L_BLUE" "D_BLUE" "L_GREY" "D_GREY")
     local seperator=""
 
     # Check if a length argument is given
@@ -136,7 +136,7 @@ _draw_seperator() {
 
     # Print out a segment of each color
     for color in "${colors[@]}"; do
-        seperator+=$color
+        seperator+=`_get_color $color`
         # Print x dashes where x in either the given or default number
         # Keeping for reference: printf "--" "-%.0s" $(seq 1 $dashes)
         # 'seq' cannot be used because it is overridden by the mss bootstrap
@@ -145,7 +145,8 @@ _draw_seperator() {
         done
     done
 
-    printf $seperator$NONE"\n"
+    seperator+=`_get_color "NONE"`
+    printf "${seperator}\n"
 }
 
 _draw_simple_seperator() {
@@ -162,10 +163,12 @@ _draw_simple_seperator() {
 
     # Check if a color argument is given
     if [[ -z "$2" ]]; then  # If not use the default
-        local color=$L_GREY
+        local color
+        color=`_get_color "L_GREY"`
 
     else  # Otherwise use the given value
-        local color=$2
+        local color
+        color=`_get_color $2`
     fi
 
     seperator+=$color
@@ -175,7 +178,8 @@ _draw_simple_seperator() {
         seperator+="―"
     done
 
-    printf $seperator$NONE"\n"
+    seperator+=`_get_color "NONE"`
+    printf "${seperator}\n"
 }
 
 _draw_bar() {
@@ -189,24 +193,30 @@ _draw_bar() {
 
     # Value at which to draw the bar yellow
     local warning_value
-    warning_value=`awk "BEGIN {print int($BAR_LENGTH-($BAR_LENGTH/5))}"`
+    warning_value=`awk "BEGIN {print int(${BAR_LENGTH}-(${BAR_LENGTH}/5))}"`
     # Value at which to draw the bar red
     local error_value
     error_value=`expr $BAR_LENGTH - 1`
 
     # Number of blocks to increment the bar
     local percinc
-    percinc=`awk "BEGIN {print int($used/$total*$BAR_LENGTH)}"`
+    percinc=`awk "BEGIN {print int(${used}/${total}*${BAR_LENGTH})}"`
 
     if (( $percinc < $warning_value )); then
-        local used_color=$LH_GREEN
-        local cap_color=$L_GREEN
+        local used_color
+        used_color=`_get_color "LH_GREEN"`
+        local cap_color
+        cap_color=`_get_color "L_GREEN"`
     elif (( $percinc < $error_value )); then
-        local used_color=$LH_YELLOW
-        local cap_color=$L_YELLOW
+        local used_color
+        used_color=`_get_color "LH_YELLOW"`
+        local cap_color
+        cap_color=`_get_color "L_YELLOW"`
     else
-        local used_color=$LH_RED
-        local cap_color=$L_RED
+        local used_color
+        used_color=`_get_color "LH_RED"`
+        local cap_color
+        cap_color=`_get_color "L_RED"`
     fi
 
     if (( $percinc > 0 )); then
@@ -214,8 +224,8 @@ _draw_bar() {
         for u in $(seq 1 $(($percinc - 1))); do
             printf " "
         done
-        # printf $cap_color$BAR_BG_COLOR"$FADED_BLOBK_S_R"
-        printf $used_color" "
+        # printf "${cap_color}${BAR_BG_COLOR}${FADED_BLOBK_S_R}"
+        printf "${used_color} "
     fi
 
     printf $BAR_BG_COLOR
@@ -223,8 +233,11 @@ _draw_bar() {
         printf " "
     done
 
+    local value_color
+    value_color=`_get_color "NONE"`
+
     # Print out the value after the bar
-    printf "${NONE}|${used}${unit} / ${total}${unit}"
+    printf "${value_color}|${used}${unit} / ${total}${unit}"
 }
 
 _find_in_array() {
@@ -253,8 +266,13 @@ _reload_fonts() {
 _prompt_for_decision() {
     # Prompt the user for a Yes / No answer.
     local message=$1
+    local prompt=""
 
-    printf $L_YELLOW"$message"$NONE
+    prompt+=`_get_color "L_YELLOW"`
+    prompt+="$message"
+    prompt+=`_get_color "NONE"`
+
+    printf "$prompt"
     read -p ": " yes_no
     printf "\n"
 
@@ -265,15 +283,30 @@ _prompt_for_decision() {
 }
 
 _print_info(){
-    printf "${D_GREEN}INFO${NONE}:${D_GREEN} ${1}\n"
+    local color
+    color=`_get_color "D_GREEN"`
+    local none
+    none=`_get_color "NONE"`
+
+    printf "${color}INFO${none}:${color} ${1}\n"
 }
 
 _print_warning(){
-    printf "${D_YELLOW}WARNING${NONE}:${D_YELLOW} ${1}\n"
+    local color
+    color=`_get_color "D_YELLOW"`
+    local none
+    none=`_get_color "NONE"`
+
+    printf "${color}WARNING${none}:${color} ${1}\n"
 }
 
 _print_error(){
-    printf "${D_RED}ERROR${NONE}:${D_RED} $1\n"
+    local color
+    color=`_get_color "D_RED"`
+    local none
+    none=`_get_color "NONE"`
+
+    printf "${color}ERROR${none}:${color} $1\n"
 }
 
 # Use `echo` to print these butons to the console
@@ -285,29 +318,42 @@ _draw_button() {
 
     # Check if a background color argument is given
     if [[ -z "$1" ]]; then  # If not use the default
-        local bg_color="$DH_GREEN"
+        local bg_color
+        bg_color=`_get_color "DH_GREEN"`
 
     else  # Otherwise use the given value
-        local bg_color=$1
+        local bg_color
+        bg_color=`_get_color $1`
     fi
 
     # Check if a text color argument is given
     if [[ -z "$2" ]]; then  # If not use the default
-        local text_color="$L_WHITE"
+        local text_color
+        text_color=`_get_color "L_WHITE"`
 
     else  # Otherwise use the given value
-        local text_color=$2
+        local text_color
+        text_color=`_get_color $2`
     fi
 
     # Check if a text color argument is given
     if [[ -z "$3" ]]; then  # If not use the default
-        local cap_color="$D_GREEN"
+        local cap_color
+        cap_color=`_get_color "D_GREEN"`
 
     else  # Otherwise use the given value
-        local cap_color=$3
+        local cap_color
+        cap_color=`_get_color $3`
     fi
 
-    printf "${cap_color}${bg_color}${text_color}${text}${1}${NONE}${cap_color}${NONE}"
+    local none
+    none=`_get_color "NONE"`
+    local semi_circle_l
+    semi_circle_l=`_get_char "SEMI_CIRCLE_L"`
+    local semi_circle_r
+    semi_circle_r=`_get_char "SEMI_CIRCLE_R"`
+
+    printf "${cap_color}${semi_circle_l}${bg_color}${text_color}${text}${1}${none}${cap_color}${semi_circle_r}${none}"
 }
 
 _get_date() {
@@ -358,16 +404,21 @@ _get_packages() {
     local requests
     requests=`echo $REZ_REQUEST | awk -F'(~)' '{print $1}' | xargs`
     local requests_array
-    requests_array=("$requests")
+    requests_array=("${requests}")
 
     if [[ ! $requests ]]; then
         return 0
     fi
 
-    local packages=$D_GREEN${requests_array[0]}$NONE
+    local package_color
+    package_color=`_get_color "D_GREEN"`
+    local none
+    none=`_get_color "NONE"`
+
+    local packages=$package_color${requests_array[0]}$none
 
     for package in "${requests_array[@]:1}"; do
-        packages+="|\[$D_GREEN\]$package\[$NONE\]"
+        packages+="|\[${package_color}\]${package}\[${none}\]"
     done
 
     printf ${packages[*]}
@@ -375,6 +426,22 @@ _get_packages() {
 
 _get_git_status() {
     # Get the git status for the current directory
+
+    local git_prompt_bg
+    git_prompt_bg=`_get_color "DH_YELLOW"`
+    local git_prompt_text
+    git_prompt_text=`_get_color "D_YELLOW"`
+    local path_bg
+    path_bg=`_get_color "DH_GREEN"`
+    local git_no_change_text
+    git_no_change_text=`_get_color "DH_TEAL"`
+    local git_no_change_arrow_color
+    git_no_change_arrow_color=`_get_color "D_TEAL"`
+    local none
+    none=`_get_color "NONE"`
+
+    local arrow_r
+    arrow_r=`get_char "ARROW_BLOCK_R"`
 
     local in_git_repo
     in_git_repo=$(git rev-parse --is-inside-work-tree)
@@ -393,10 +460,10 @@ _get_git_status() {
 
     # Check for uncommitted changes
     if [[ -n "${git_changes// }" ]]; then
-        local git_prompt="${DH_YELLOW}${git_branch}(${git_changes})${NONE}${D_YELLOW}${DH_GREEN}${ARROW_BLOCK_R}${NONE}"
+        local git_prompt="${git_prompt_bg}${git_branch}(${git_changes})${none}${git_prompt_text}${path_bg}${arrow_r}${none}"
 
     else
-        local git_prompt="${DH_TEAL}${git_branch}${NONE}${D_TEAL}${DH_GREEN}${ARROW_BLOCK_R}${NONE}"
+        local git_prompt="${git_no_change_text}${git_branch}${none}${git_no_change_arrow_color}${path_bg}${arrow_r}${none}"
     fi
 
     printf "$git_prompt"

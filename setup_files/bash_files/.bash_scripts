@@ -3,15 +3,16 @@
 
 source /home/pi/.bash_colors
 
-alias flip=_flip_a_coin
-alias roll=_roll_the_dice
-alias lets_eat=_lets_eat
-
 _flip_a_coin() {
     # Flip a coin
-    local throw=$[$RANDOM % 2]
+    local none
+    none=`_get_color "NONE"`
+    local blue
+    blue=`_get_color "L_BLUE"`
+    local bold
+    bold=`_get_color "BOLD"`
 
-    printf $L_YELLOW"⛀"$NONE" Flipping a coin: "
+    local throw=$[$RANDOM % 2]
 
     if [[ $throw == 0 ]]; then
         local flip_result="Heads"
@@ -19,7 +20,7 @@ _flip_a_coin() {
         local flip_result="Tails"
     fi
 
-    printf $BOLD$L_BLUE$flip_result$NONE"\n"
+    printf "Flipping a coin: ${bold}${blue}${flip_result}${none}\n"
 }
 
 _roll_the_dice(){
@@ -27,8 +28,17 @@ _roll_the_dice(){
     # Eg. 2d6 will roll 2 6-sided dice
     # Eg. 3d10 will roll 3 10-sided dice
 
+    local none
+    none=`_get_color "NONE"`
+    local blue
+    blue=`_get_color "L_BLUE"`
+    local bold
+    bold=`_get_color "BOLD"`
+    local red
+    red=`_get_color "D_RED"`
+
     if ! [[ $1 =~ ^[0-9]+d[0-9]+$ ]]; then
-        printf $D_RED"Error"$NONE": "$D_RED"Argument does not match standard dice notation "$NONE"("$D_RED"Eg. 2d6"$NONE")\n"
+        printf "${red}Error${none}: ${red}Argument does not match standard dice notation ${none}(${red}Eg. 2d6${none})\n"
         return 1
     fi
 
@@ -36,7 +46,7 @@ _roll_the_dice(){
     local args
     args=`echo $1 | awk -F'(d)' '{print $1 " " $2}'`
     local args_array
-    args_array=("$args")
+    read -a args_array <<< $args
     local number
     number=$[args_array[0]]  # Number of dice to roll
     local type
@@ -44,7 +54,7 @@ _roll_the_dice(){
     local total
     total=0  # Total value
 
-    printf "🎲 Rolling "$BOLD$1$NONE": "
+    printf "Rolling ${bold}$1${none}: "
 
     # Roll each die
     for die in $(seq 1 $number); do
@@ -52,13 +62,13 @@ _roll_the_dice(){
         local throw
         throw=$[$RANDOM % $type + 1]
         total=$(($total + $throw))
-        printf $L_BLUE"$throw"$NONE
+        printf "${blue}${throw}${none}"
         if [[ $die != "$number" ]]; then
             printf ", "
         else
-            print "\n"
+            printf "\n"
         fi
     done
 
-    printf "Total: $BOLD$L_BLUE$total$NONE\n"
+    printf "Total: ${bold}${blue}${total}${none}\n"
 }

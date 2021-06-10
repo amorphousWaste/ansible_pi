@@ -6,19 +6,28 @@ _create_motd() {
     # Draw the standard MOTD
     local units=G  # For GB
 
+    local green
+    green=`_get_color "D_GREEN"`
+    local red
+    red=`_get_color "D_RED"`
+    local blue
+    blue=`_get_color "L_BLUE"`
+    local none
+    none=`_get_color "NONE"`
+
     # Draw the MOTD
     _draw_seperator
-    # printf "$D_GREEN    .~~.   .~~.    ${L_BLUE}OS............: ${NONE}${os_version}\n"
-    printf "$D_GREEN    .~~.   .~~.    ${L_BLUE}OS.............: ${NONE}$(uname -srmo)\n"
-    printf "$D_GREEN   '. \ ' ' / .'   ${L_BLUE}Host...........: ${NONE}`hostname`@`hostname --all-ip-addresses`\n"
-    printf "$D_RED    .~ .~~~..~.    ${L_BLUE}Processes......: ${NONE}$(ps ax | wc -l | tr -d ' ')\n"
-    printf "$D_RED   : .~.'~'.~. :   ${L_BLUE}Last Login.....: ${NONE}"; _get_last_login; printf "\n"
-    printf "$D_RED  ~ (   ) (   ) ~  ${L_BLUE}Uptime.........: ${NONE}"; _calculate_uptime; printf "\n"
-    printf "$D_RED ( : '~'.~.'~' : ) ${L_BLUE}Temperatures...: ${NONE}"; _get_temps; printf "\n"
-    printf "$D_RED  ~ .~ (   ) ~. ~  ${L_BLUE}Disk Space Used: ${NONE}"; _draw_bar "$(_get_disk_space_used)" "$(_get_disk_space_total)" $units; printf "\n"
-    printf "$D_RED   (  : '~' :  )   ${L_BLUE}Swap...........: ${NONE}"; _draw_bar "$(_get_swap_used)" "$(_get_swap_total)" $units; printf "\n"
-    printf "$D_RED    '~ .~~~. ~'    ${L_BLUE}Tmp Space Used.: ${NONE}"; _draw_bar "$(_get_temp_space_used)" "$(_get_temp_space_total)" "K"; printf "\n"
-    printf "$D_RED        '~'        ${L_BLUE}Memory.........: ${NONE}"; _draw_bar "$(_get_memory_used)" "$(_get_memory_total)" $units; printf "\n"
+    # printf "${green}    .~~.   .~~.    ${blue}OS............: ${none}${os_version}\n"
+    printf "${green}    .~~.   .~~.    ${blue}OS.............: ${none}$(uname -srmo)\n"
+    printf "${green}   '. \ ' ' / .'   ${blue}Host...........: ${none}`hostname`@`hostname --all-ip-addresses`\n"
+    printf "${red}    .~ .~~~..~.    ${blue}Processes......: ${none}$(ps ax | wc -l | tr -d ' ')\n"
+    printf "${red}   : .~.'~'.~. :   ${blue}Last Login.....: ${none}"; _get_last_login; printf "\n"
+    printf "${red}  ~ (   ) (   ) ~  ${blue}Uptime.........: ${none}"; _calculate_uptime; printf "\n"
+    printf "${red} ( : '~'.~.'~' : ) ${blue}Temperatures...: ${none}"; _get_temps; printf "\n"
+    printf "${red}  ~ .~ (   ) ~. ~  ${blue}Disk Space Used: ${none}"; _draw_bar "$(_get_disk_space_used)" "$(_get_disk_space_total)" $units; printf "\n"
+    printf "${red}   (  : '~' :  )   ${blue}Swap...........: ${none}"; _draw_bar "$(_get_swap_used)" "$(_get_swap_total)" $units; printf "\n"
+    printf "${red}    '~ .~~~. ~'    ${blue}Tmp Space Used.: ${none}"; _draw_bar "$(_get_temp_space_used)" "$(_get_temp_space_total)" "K"; printf "\n"
+    printf "${red}        '~'        ${blue}Memory.........: ${none}"; _draw_bar "$(_get_memory_used)" "$(_get_memory_total)" $units; printf "\n"
     _draw_seperator
 }
 

@@ -1,49 +1,56 @@
 #!/bin/bash
 
 # Colors
+_get_color (){
+    # Define all the color variables
+    local color=$1
 
-# Define all the color variables
-export NONE="\033[0m"
-export BOLD="\033[1m"
-export QUARTER="\033[2m"
-export ITALLIC="\033[3m"
-export UNDERLINE="\033[4m"
-export H_WHITE="\033[7m"
-export H_BLACK="\033[8m"
-export STRIKE="\033[9m"
-export D_GREY="\033[30m"
-export D_RED="\033[31m"
-export D_GREEN="\033[32m"
-export D_YELLOW="\033[33m"
-export D_BLUE="\033[34m"
-export D_PURPLE="\033[35m"
-export D_TEAL="\033[36m"
-export DH_GREY="\033[40m"
-export DH_RED="\033[41m"
-export DH_GREEN="\033[42m"
-export DH_YELLOW="\033[43m"
-export DH_BLUE="\033[44m"
-export DH_PURPLE="\033[45m"
-export DH_TEAL="\033[46m"
-export DH_WHITE="\033[47m"
-export L_GREY="\033[90m"
-export L_RED="\033[91m"
-export L_GREEN="\033[92m"
-export L_YELLOW="\033[93m"
-export L_BLUE="\033[94m"
-export L_PURPLE="\033[95m"
-export L_TEAL="\033[96m"
-export L_WHITE="\033[97m"
-export LH_GREY="\033[100m"
-export LH_RED="\033[101m"
-export LH_GREEN="\033[102m"
-export LH_YELLOW="\033[103m"
-export LH_BLUE="\033[104m"
-export LH_PURPLE="\033[105m"
-export LH_TEAL="\033[106m"
-export LH_WHITE="\033[107m"
+    declare -A colors
 
-function _color_ref () {
+    colors['NONE']='\033[0m'
+    colors['BOLD']='\033[1m'
+    colors['QUARTER']='\033[2m'
+    colors['ITALLIC']='\033[3m'
+    colors['UNDERLINE']='\033[4m'
+    colors['H_WHITE']='\033[7m'
+    colors['H_BLACK']='\033[8m'
+    colors['STRIKE']='\033[9m'
+    colors['D_GREY']='\033[30m'
+    colors['D_RED']='\033[31m'
+    colors['D_GREEN']='\033[32m'
+    colors['D_YELLOW']='\033[33m'
+    colors['D_BLUE']='\033[34m'
+    colors['D_PURPLE']='\033[35m'
+    colors['D_TEAL']='\033[36m'
+    colors['DH_GREY']='\033[40m'
+    colors['DH_RED']='\033[41m'
+    colors['DH_GREEN']='\033[42m'
+    colors['DH_YELLOW']='\033[43m'
+    colors['DH_BLUE']='\033[44m'
+    colors['DH_PURPLE']='\033[45m'
+    colors['DH_TEAL']='\033[46m'
+    colors['DH_WHITE']='\033[47m'
+    colors['L_GREY']='\033[90m'
+    colors['L_RED']='\033[91m'
+    colors['L_GREEN']='\033[92m'
+    colors['L_YELLOW']='\033[93m'
+    colors['L_BLUE']='\033[94m'
+    colors['L_PURPLE']='\033[95m'
+    colors['L_TEAL']='\033[96m'
+    colors['L_WHITE']='\033[97m'
+    colors['LH_GREY']='\033[100m'
+    colors['LH_RED']='\033[101m'
+    colors['LH_GREEN']='\033[102m'
+    colors['LH_YELLOW']='\033[103m'
+    colors['LH_BLUE']='\033[104m'
+    colors['LH_PURPLE']='\033[105m'
+    colors['LH_TEAL']='\033[106m'
+    colors['LH_WHITE']='\033[107m'
+
+    printf "${colors[$color]}"
+}
+
+_color_ref () {
     # Show all the avaiable color variables
     # Used for reference
     for i in `seq 0 9`
@@ -68,9 +75,19 @@ function _color_ref () {
 }
 
 # Characters
+_get_char () {
+    # Special characters
 
-# Special characters
-export SLASH_BLOCK_R=""
-export ARROW_BLOCK_R=""
-export FADED_BLOBK_S_R=""
-export ARROW_CHAR_R=""
+    local char=$1
+
+    declare -A chars
+
+    chars['SLASH_BLOCK_R']=''
+    chars['ARROW_BLOCK_R']=''
+    chars['FADED_BLOBK_S_R']=''
+    chars['ARROW_CHAR_R']=''
+    chars['SEMI_CIRCLE_L']=''
+    chars['SEMI_CIRCLE_R']=''
+
+    printf "${chars[$char]}"
+}

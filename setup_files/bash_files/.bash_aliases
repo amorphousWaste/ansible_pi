@@ -31,3 +31,6 @@ alias check_temp='/opt/vc/bin/vcgencmd measure_temp'
 alias check_space='df -Ht rootfs'
 alias check_ram='grep MemTotal /proc/meminfo; grep MemFree /proc/meminfo; grep MemAvailable /proc/meminfo'
 alias check_voltage=_get_voltage
+
+alias flip=_flip_a_coin
+alias roll=_roll_the_dice
