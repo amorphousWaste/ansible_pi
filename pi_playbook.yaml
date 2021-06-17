@@ -519,6 +519,11 @@
                 cmd: "mv {{ downloads_path }}/micro /usr/bin/micro"
             when: micro_downloaded is changed
 
+        -   name: Install micro plugins
+            ansible.builtin.shell:
+                cmd: "micro -plugin install {{ micro_plugins | join(' ') }}"
+            when: micro_downloaded is changed
+
     -   name: Create or append .inputrc
         ansible.builtin.blockinfile:
             block: set completion-ignore-case on

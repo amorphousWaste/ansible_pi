@@ -86,6 +86,10 @@
             cmd: "mv {{ downloads_path }}/micro /usr/bin/micro"
         when: micro_downloaded is changed
 
+    -   name: Update micro plugins
+        ansible.builtin.shell:
+            cmd: "micro -plugin update {{ micro_plugins | join(' ') }}"
+
     -   name: install Oh My Zsh
         ansible.builtin.git:
             repo: https://github.com/robbyrussell/oh-my-zsh

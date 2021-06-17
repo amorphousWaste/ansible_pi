@@ -110,6 +110,17 @@ ssh_files:
 -   id_ed25519
 -   id_ed25519.pub
 
+micro_plugins:
+-   aspell
+-   detectindent
+-   editorconfig
+-   filemanager
+-   gotham-colors
+-   jump
+-   manipulator
+-   quoter
+-   wc
+
 python_files: ./python
 setup_files: ./setup_files
 software_files: ./software
