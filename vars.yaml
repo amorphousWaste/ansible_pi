@@ -34,8 +34,11 @@ pip_packages:
 -   Flask
 -   Pillow
 -   PyYAML
+-   aiofiles
+-   aiohttp
 -   black
 -   cookiecutter
+-   curio
 -   cython
 -   discord
 -   flask-bootstrap
