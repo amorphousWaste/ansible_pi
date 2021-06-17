@@ -560,13 +560,13 @@
 
         -   name: Copy apache config file
             ansible.builtin.copy:
-                src: "{{ setup_files }}/apache2.conf"
+                src: "{{ setup_files }}/apache_files/apache2.conf"
                 dest: "{{ apache_config_path }}"
                 force: true
 
         -   name: Copy ssl key
             ansible.builtin.copy:
-                src: "{{ setup_files }}/ssl_key_example.key"
+                src: "{{ setup_files }}/apache_files/ssl_key_example.key"
                 dest: "{{ ssl_path }}"
                 force: true
         become: true
