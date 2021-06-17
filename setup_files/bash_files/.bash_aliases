@@ -17,6 +17,9 @@ alias ipy=_rez_and_ipython
 alias tosrc=_tosrc
 alias topkg=_topkg
 
+alias commits="git log --color --pretty=format:'%Cred%h%Creset - %C(yellow)%d%Creset %s %C(green)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
+alias gitg="git log --graph --oneline"
+
 alias python='python3'
 alias pip='pip3'
 alias ipy='ipython3'
