@@ -64,10 +64,13 @@ pip_packages:
 -   pylama
 -   pyqtgraph
 -   pyserial
+-   pytest
+-   pytest-cov
 -   python-dotenv
 -   rabbitmq
 -   radon
 -   requests
+-   rx
 -   setuptools
 -   sqlalchemy
 -   twitchio
