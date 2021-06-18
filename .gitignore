@@ -139,3 +139,4 @@ setup_files/git_ssh_keys/id_*
 setup_files/jupyter_files/jupytercert.*
 *.zip
 *.otf
+*.img
