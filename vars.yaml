@@ -127,6 +127,7 @@ micro_plugins:
 -   quoter
 -   wc
 
+notes_files: ./notes
 python_files: ./python
 setup_files: ./setup_files
 software_files: ./software

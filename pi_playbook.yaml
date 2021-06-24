@@ -754,19 +754,21 @@
                     systemctl start jupyter.service
         when: ansible_hostname == "pi4"
 
-    -   name: RetroPie block
+    -   name: Copy Notes block
         block:
-        -   name: Check for retropie.md
-            ansible.builtin.stat:
-                path: ~/retropie.md
-            register: hints_exists
+        -   name: Copy apngasm.md
+            ansible.builtin.copy:
+                src: "{{ notes_files }}/apngasm.md"
+                dest: "{{ home_path }}/documents/apngasm.md"
 
         -   name: Copy retropie.md
             ansible.builtin.copy:
-                src: "{{ setup_files }}/retropie.md"
+                src: "{{ notes_files }}/retropie.md"
                 dest: "{{ home_path }}/documents/retropie.md"
-            when: not hints_exists.stat.exists
+            when: ansible_hostname == "picade"
 
+    -   name: RetroPie block
+        block:
         -   name: Check for RetroPie installed
             ansible.builtin.stat:
                 dest: "{{ retropie_installation_dir }}"
