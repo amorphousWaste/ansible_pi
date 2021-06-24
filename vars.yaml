@@ -6,6 +6,7 @@ apt_packages:
 -   apache2
 -   cmake
 -   exfat-fuse
+-   ffmpeg
 -   git
 -   i2c-tools
 -   lsb-release
@@ -23,6 +24,7 @@ apt_packages:
 -   software-properties-common
 -   tree
 -   unzip
+-   usbmount
 -   uuid-runtime
 -   zsh
 
