@@ -10,6 +10,8 @@ apt_packages:
 -   git
 -   i2c-tools
 -   lsb-release
+-   nodejs
+-   npm
 -   p7zip-full
 -   python-apt
 -   python-fontforge
@@ -128,6 +130,8 @@ micro_plugins:
 -   manipulator
 -   quoter
 -   wc
+
+nodejs_version: 14
 
 notes_files: ./notes
 python_files: ./python
