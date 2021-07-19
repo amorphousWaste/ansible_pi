@@ -767,6 +767,33 @@
                 dest: "{{ home_path }}/documents/retropie.md"
             when: ansible_hostname == "picade"
 
+    -   name: Node-RED block
+        block:
+        -   name: Add required Node.js {{ nodejs_version }} repo
+            ansible.builtin.shell:
+                cmd: "curl -sL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | sudo bash -"
+
+        -   name: Install Node.js {{ nodejs_version }}
+            become: true
+            ansible.builtin.apt:
+                update_cache: true
+                name: nodejs
+
+        -   name: Install Node-RED
+            ansible.builtin.shell:
+                cmd: "bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)"
+
+        -   name: Run Node-RED on boot
+            become: true
+            ansible.builtin.shell:
+                cmd: "systemctl enable nodered.service"
+
+        -   name: Clean up Node.js
+            become: true
+            ansible.builtin.apt:
+                autoremove: true
+        when: ansible_hostname == "pi4"
+
     -   name: RetroPie block
         block:
         -   name: Check for RetroPie installed
