@@ -810,6 +810,102 @@
                 autoremove: true
         when: ansible_hostname == "pi4"
 
+    -   name: Prometheus Block
+        block:
+        -   name: Check for Prometheus
+            ansible.builtin.stat:
+                dest: "{{home_path}}/prometheus"
+            register: prometheus_exists
+
+        -   name: Download Prometheus
+            ansible.builtin.get_url:
+                url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_build }}.tar.gz"
+                dest: "{{ prometheus_download_path }}"
+            when: not prometheus_exists.stat.exists
+
+        -   name: Unzip Prometheus
+            ansible.builtin.unarchive:
+                src: "{{ prometheus_download_path }}"
+                dest: "{{ home_path }}"
+                remote_src: yes
+            when: not prometheus_exists.stat.exists
+
+        -   name: Rename Prometheus directory
+            ansible.builtin.shell:
+                chdir: "{{ home_path }}"
+                cmd: "mv prometheus-{{ prometheus_build }} prometheus"
+            when: not prometheus_exists.stat.exists
+
+        -   name: Remove Prometheus Archive
+            ansible.builtin.file:
+                path: "{{ prometheus_download_path }}"
+                state: absent
+            when: not prometheus_exists.stat.exists
+
+        -   name: Copy Prometheus service file
+            become: true
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/prometheus_files/prometheus.service"
+                dest: /etc/systemd/system/prometheus.service
+
+        -   name: Start Prometheus service
+            become: true
+            ansible.builtin.shell:
+                cmd: systemctl start prometheus
+
+        -   name: Copy Prometheus Config
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/prometheus_files/prometheus.yml"
+                dest: "{{home_path}}/prometheus/prometheus.yml"
+
+        when: ansible_hostname == "pi4"
+
+    -   name: Prometheus Node Exporter Block
+        block:
+        -   name: Check for Prometheus Node
+            ansible.builtin.stat:
+                dest: /opt/node-exporter/node-exporter
+            register: prometheus_node_exists
+
+        -   name: Create Prometheus Node
+            become: true
+            ansible.builtin.file:
+                path: /opt/node-exporter
+                state: directory
+            when: not prometheus_node_exists.stat.exists
+
+        -   name: Download Prometheus Node
+            ansible.builtin.get_url:
+                url: "https://github.com/prometheus/node_exporter/releases/download/v{{ prometheus_node_version }}/node_exporter-{{ prometheus_node_build }}.tar.gz"
+                dest: "{{ prometheus_node_download_path }}"
+            when: not prometheus_node_exists.stat.exists
+
+        -   name: Unzip Prometheus Node
+            become: true
+            ansible.builtin.unarchive:
+                src: "{{ prometheus_node_download_path }}"
+                dest: /opt/node-exporter
+                remote_src: yes
+                extra_opts: [--strip-components=1]
+            when: not prometheus_node_exists.stat.exists
+
+        -   name: Remove Prometheus Node archive
+            ansible.builtin.file:
+                path: "{{ prometheus_node_download_path }}"
+                state: absent
+            when: not prometheus_node_exists.stat.exists
+
+        -   name: Copy Prometheus Node service file
+            become: true
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/prometheus_files/nodeexporter.service"
+                dest: /etc/systemd/system/nodeexporter.service
+
+        -   name: Start Prometheus Node service
+            become: true
+            ansible.builtin.shell:
+                cmd: systemctl start nodeexporter
+
     -   name: RetroPie block
         block:
         -   name: Check for RetroPie installed
