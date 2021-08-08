@@ -60,46 +60,62 @@
             update_password: always
         when: ansible_hostname == 'pihole'
 
-    -   name: Update locale generation file (add en_US.UTF-8)
-        become: true
-        ansible.builtin.lineinfile:
-            path: /etc/locale.gen
-            regexp: "^# {{ locale }} UTF-8"
-            state: present
-            line: "{{ locale }} UTF-8"
+    -   name: Locale Block
+        block:
+        -   name: Update locale generation file (add en_US.UTF-8)
+            become: true
+            ansible.builtin.lineinfile:
+                path: /etc/locale.gen
+                regexp: "^# {{ locale }} UTF-8"
+                state: present
+                line: "{{ locale }} UTF-8"
 
-    -   name: Update locale generation file (remove en_GB.UTF-8)
-        become: true
-        ansible.builtin.lineinfile:
-            path: /etc/locale.gen
-            regexp: "^en_GB.UTF-8 UTF-8"
-            state: present
-            line: "# en_GB.UTF-8 UTF-8"
+        -   name: Update locale generation file (remove en_GB.UTF-8)
+            become: true
+            ansible.builtin.lineinfile:
+                path: /etc/locale.gen
+                regexp: "^en_GB.UTF-8 UTF-8"
+                state: present
+                line: "# en_GB.UTF-8 UTF-8"
 
-    -   name: Remove locale archive
-        become: true
-        ansible.builtin.file:
-            path: /usr/lib/locale/locale-archive
-            state: absent
+        -   name: Remove locale archive
+            become: true
+            ansible.builtin.file:
+                path: /usr/lib/locale/locale-archive
+                state: absent
 
-    -   name: Generate locale
-        become: true
-        ansible.builtin.shell:
-            cmd: locale-gen
-        environment:
-            PATH: "/usr/sbin/:{{ ansible_env.PATH }}"
+        -   name: Generate locale
+            become: true
+            ansible.builtin.shell:
+                cmd: locale-gen
+            environment:
+                PATH: "/usr/sbin/:{{ ansible_env.PATH }}"
 
-    # -   name: Update locale
-    #     become: true
-    #     ansible.builtin.shell:
-    #         cmd: "update-locale {{ locale }}"
-    #     environment:
-    #         PATH: "/usr/sbin/:{{ ansible_env.PATH }}"
+        # -   name: Update locale
+        #     become: true
+        #     ansible.builtin.shell:
+        #         cmd: "update-locale {{ locale }}"
+        #     environment:
+        #         PATH: "/usr/sbin/:{{ ansible_env.PATH }}"
 
-    -   name: Set locale
-        become: true
-        ansible.builtin.shell:
-            cmd: "localectl set-locale \"{{ locale }}\""
+        -   name: Set locale
+            become: true
+            ansible.builtin.shell:
+                cmd: "localectl set-locale \"{{ locale }}\""
+
+        -   name: Update default locals
+            # Used to prevent locale errors during ssh
+            become: true
+            ansible.builtin.blockinfile:
+                path: /etc/default/locale
+                block: |
+                    # Add locale dafaults
+                    LANG=en_US.UTF-8
+                    LC_CTYPE=en_US.UTF-8
+                    LC_ALL=en_US.UTF-8
+                    LANGUAGE=en_US.UTF-8
+                insertafter: EOF
+                marker: "# {mark} ANSIBLE BLOCK: Locale"
 
     -   name: Set timezone
         become: true
