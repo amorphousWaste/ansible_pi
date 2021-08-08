@@ -133,6 +133,10 @@ micro_plugins:
 -   wc
 
 nodejs_version: 14
+prometheus_version: 2.28.1
+prometheus_build: "{{ prometheus_version }}.linux-armv7"
+prometheus_node_version: 1.2.2
+prometheus_node_build: "{{ prometheus_node_version }}.linux-armv7"
 
 notes_files: ./notes
 python_files: ./python
@@ -154,6 +158,9 @@ ngrok_path: "{{ home_path }}/ngrok"
 oh_my_zsh_path: "{{ home_path }}/.oh-my-zsh"
 pip_packages_path: "{{ home_path }}/.local/lib/python3.7/site-packages"
 profile_path: /etc/profile
+prometheus_download_path: "{{ downloads_path }}/prometheus-{{ prometheus_build }}.tar.gz"
+prometheus_node_download_path: "{{ downloads_path }}/prometheus-{{ prometheus_node_build }}.tar.gz"
+prometheus_node_path: /opt/node-exporter
 python_path: "{{ home_path }}/python"
 rc_local_path: /etc/rc.local
 retropie_installation_dir: /opt/retropie
