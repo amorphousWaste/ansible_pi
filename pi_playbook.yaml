@@ -857,7 +857,6 @@
             ansible.builtin.copy:
                 src: "{{ setup_files }}/prometheus_files/prometheus.yml"
                 dest: "{{home_path}}/prometheus/prometheus.yml"
-
         when: ansible_hostname == "pi4"
 
     -   name: Prometheus Node Exporter Block
@@ -867,18 +866,28 @@
                 dest: /opt/node-exporter/node-exporter
             register: prometheus_node_exists
 
-        -   name: Create Prometheus Node
+        -   name: Create Prometheus Node Folder
             become: true
             ansible.builtin.file:
                 path: /opt/node-exporter
                 state: directory
             when: not prometheus_node_exists.stat.exists
 
-        -   name: Download Prometheus Node
+        -   name: Download Prometheus Node (armv7)
             ansible.builtin.get_url:
-                url: "https://github.com/prometheus/node_exporter/releases/download/v{{ prometheus_node_version }}/node_exporter-{{ prometheus_node_build }}.tar.gz"
+                url: "https://github.com/prometheus/node_exporter/releases/download/v{{ prometheus_node_version }}/node_exporter-{{ prometheus_node_build_armv7 }}.tar.gz"
                 dest: "{{ prometheus_node_download_path }}"
-            when: not prometheus_node_exists.stat.exists
+            when: |
+                not prometheus_node_exists.stat.exists
+                and ansible_hostname in groups.armv7
+
+        -   name: Download Prometheus Node (armv6)
+            ansible.builtin.get_url:
+                url: "https://github.com/prometheus/node_exporter/releases/download/v{{ prometheus_node_version }}/node_exporter-{{ prometheus_node_build_armv6 }}.tar.gz"
+                dest: "{{ prometheus_node_download_path }}"
+            when: |
+                not prometheus_node_exists.stat.exists
+                and ansible_hostname in groups.armv6
 
         -   name: Unzip Prometheus Node
             become: true
