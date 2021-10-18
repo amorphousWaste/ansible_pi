@@ -9,6 +9,7 @@ apt_packages:
 -   ffmpeg
 -   git
 -   i2c-tools
+-   libcups2-dev  # Needed to fix pycups build error
 -   lsb-release
 -   nodejs
 -   npm
