@@ -692,6 +692,11 @@
                 chdir: "{{ home_path }}/ngrok"
                 cmd:  "./ngrok authtoken {{ ngrok_auth_token }}"
             when: not ngrok_installed.stat.exists
+
+        -   name: Update ngrok
+            ansible.builtin.shell:
+                chdir: "{{ home_path }}/ngrok"
+                cmd: "./ngrok update"
         when: ansible_hostname == "pi4"
 
     -   name: RabbitMQ block
