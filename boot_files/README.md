@@ -7,8 +7,14 @@ These files should be put into the `boot` partition of a Raspbian image so that 
 5.  Burn the image to an appropriate SD card. You can download an [official tool](https://www.raspberrypi.org/software/) or [balena Etcher](https://www.balena.io/etcher/) to make this task easier.
 6.  Insert the memory card into your Raspberry Pi and plug it in.
 7.  Wait until the Pi boots to the CLI (Command Line Interface) or desktop.
-8.  From the host machine, create an ssh key if one does not already exist.
-9.  Copy the ssh key to the target machine(s) using the builtin `ssh-copy-id` command.
+9.  From the host machine, create an ssh key if one does not already exist.
+10. Copy the ssh key to the target machine(s) using the builtin `ssh-copy-id` command.
+    ```bash
+    ssh-copy-id -i key pi@host
+    ```
+    ```bash
+    ssh-copy-id -i ./id_rsa pi@192.168.1.1
+    ```
 
 At this point, it should be ready for a playbook to be run.
 
