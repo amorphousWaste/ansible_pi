@@ -359,6 +359,7 @@
             ansible.builtin.shell:
                 cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
             when: not rustup_installed.stat.exists
+        when: ansible_hostname != 'pi0'
 
     -   name: bat block
         block:
@@ -404,6 +405,7 @@
                 path: "{{ config_path }}/bat/config"
                 insertafter: EOF
                 marker: "# {mark} ANSIBLE BLOCK: bat"
+        when: ansible_hostname != 'pi0'
 
     -   name: Pi-hole block
         block:
