@@ -334,6 +334,15 @@
         environment:
             PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
 
+    -   name: Install additional python3 packages
+        ansible.builtin.pip:
+            executable: pip3
+            name: "{{ pip_packages_non_pi0 }}"
+            extra_args: --upgrade
+        environment:
+            PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
+        when: ansible_hostname != 'pi0'
+
     -   name: Copy python scripts
         ansible.builtin.copy:
             src: "{{ python_files }}"

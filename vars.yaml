@@ -45,7 +45,6 @@ pip_packages:
 -   cookiecutter
 -   curio
 -   cython
--   dearpygui
 -   discord
 -   flask-bootstrap
 -   flask-login
@@ -83,6 +82,9 @@ pip_packages:
 -   urllib3
 -   websockets
 -   wheel
+
+pip_packages_non_pi0:
+-   dearpygui
 
 picade_packages:
 -   bchunk
