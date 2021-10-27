@@ -358,6 +358,7 @@
         -   name: Install rustup  # Used to install rustc and cargo
             ansible.builtin.shell:
                 cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+                warn: false
             when: not rustup_installed.stat.exists
         when: ansible_hostname != 'pi0'
 
@@ -537,6 +538,7 @@
             ansible.builtin.shell:
                 cmd: "curl https://getmic.ro | bash"
                 chdir: "{{ downloads_path }}"
+                warn: false
             register: micro_downloaded
             when: not micro_installed.stat.exists
 
@@ -804,6 +806,7 @@
         -   name: Add required Node.js {{ nodejs_version }} repo
             ansible.builtin.shell:
                 cmd: "curl -sL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | sudo bash -"
+                warn: false
 
         -   name: Install Node.js {{ nodejs_version }}
             become: true
@@ -814,6 +817,7 @@
         -   name: Install Node-RED
             ansible.builtin.shell:
                 cmd: "bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)"
+                warn: false
 
         -   name: Run Node-RED on boot
             become: true
