@@ -1,6 +1,6 @@
 ---
 -   name: RPI Deployment Playbook
-    hosts: pi4  # all
+    hosts: picade  # all
     any_errors_fatal: false
     gather_facts: true
     vars_files:
@@ -59,6 +59,14 @@
             password: "{{ pass_pihole|password_hash('sha512') }}"
             update_password: always
         when: ansible_hostname == 'pihole'
+
+    -   name: Set new password picade
+        become: true
+        ansible.builtin.user:
+            name: "{{ user }}"
+            password: "{{ pass_picade|password_hash('sha512') }}"
+            update_password: always
+        when: ansible_hostname == 'picade'
 
     -   name: Locale Block
         block:
@@ -138,16 +146,6 @@
             insertbefore: "exit 0"
             marker: "# {mark} ANSIBLE BLOCK: WiFi Power"
 
-    -   name: Disable HDMI
-        become: true
-        ansible.builtin.blockinfile:
-            path: "{{ rc_local_path }}"
-            block: |
-                # Turn off HDMI to save some power
-                /usr/bin/tvservice -o
-            insertbefore: "exit 0"
-            marker: "# {mark} ANSIBLE BLOCK: HDMI Power"
-
     -   name: Set ssh_config SendEnv to send nothing
         become: true
         ansible.builtin.lineinfile:
@@ -217,7 +215,9 @@
                 bash -c 'echo 0 > /sys/class/leds/led1/brightness'
             insertbefore: "exit 0"
             marker: "# {mark} ANSIBLE BLOCK: PWR LED Power"
-        when: ansible_hostname == 'pi4'
+        when: |
+            ansible_hostname == 'pi4'
+            or ansible_hostname == 'picade'
 
     # Although this is already in the config.txt file,
     # that does not seem to enable it completely, so we set this as well.
@@ -227,6 +227,24 @@
             path: /etc/modules
             line: i2c-dev
             insertafter: EOF
+
+    -   name: Create file needed when waiting for network
+        become: true
+        ansible.builtin.file:
+            path: /etc/systemd/system/dhcpcd.service.d/
+            recurse: true
+            state: touch
+
+    -   name: Set wait for network on boot
+        become: true
+        ansible.builtin.blockinfile:
+            path: /etc/systemd/system/dhcpcd.service.d/wait.conf
+            block: |
+                [Service]
+                ExecStart=
+                ExecStart=/usr/sbin/dhcpcd -w -q
+            insertafter: EOF
+            marker: "# {mark} ANSIBLE BLOCK: Wait for Network On Boot"
 
     -   name: Create home directories
         ansible.builtin.file:
@@ -310,6 +328,13 @@
             name: "{{ apt_packages }}"
         register: packages_installed
 
+    -   name: Install apt packages for picade
+        become: true
+        ansible.builtin.apt:
+            name: "{{ picade_packages }}"
+        register: packages_installed
+        when: ansible_hostname == 'picade'
+
     -   name: Reboot after apt install
         become: true
         ansible.builtin.reboot:
@@ -320,7 +345,6 @@
     # gaurenteed to be present during the next install task.
     -   name: Install python3 preinstall packages
         ansible.builtin.pip:
-            executable: pip3
             name: "{{ pip_packages_preinstall }}"
             extra_args: --upgrade
         environment:
@@ -328,20 +352,18 @@
 
     -   name: Install python3 packages
         ansible.builtin.pip:
-            executable: pip3
-            name: "{{ pip_packages }}"
+            name: "{{ universal_pip_packages }}"
             extra_args: --upgrade
         environment:
             PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
 
-    -   name: Install additional python3 packages
+    -   name: Install additional python3 packages for pi4
         ansible.builtin.pip:
-            executable: pip3
-            name: "{{ pip_packages_non_pi0 }}"
+            name: "{{ pi4_pip_packages }}"
             extra_args: --upgrade
         environment:
             PATH: "{{ pip_packages_path }}:/usr/bin/python3:{{ ansible_env.PATH }}"
-        when: ansible_hostname != 'pi0'
+        when: ansible_hostname == 'pi4'
 
     -   name: Copy python scripts
         ansible.builtin.copy:
@@ -651,17 +673,45 @@
                 line: "plugins=(git zsh-autosuggestions autojump zsh-syntax-highlighting)"
 
     # Desktop environment block
-    -   name: Check if there is a desktop environment
-        ansible.builtin.stat:
-            path: /usr/share/xsessions/LXDE.desktop
-        register: desktop_exists
+    -   name: Desktop Block
+        block:
+        -   name: Check if there is a desktop environment
+            ansible.builtin.stat:
+                path: /usr/share/xsessions/LXDE.desktop
+            register: desktop_exists
 
-    -   name: Copy panel config file
-        become: true
-        ansible.builtin.copy:
-            src: "{{ setup_files }}/panel"
-            dest: "{{ home_path }}/.config/lxpanel/LXDE-pi/panels/panel"
-        when: desktop_exists.stat.exists
+        -   name: Copy panel config file
+            become: true
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/panel"
+                dest: "{{ home_path }}/.config/lxpanel/LXDE-pi/panels/panel"
+            when: desktop_exists.stat.exists
+
+        -   name: Disable HDMI
+            become: true
+            ansible.builtin.blockinfile:
+                path: "{{ rc_local_path }}"
+                block: |
+                    # Turn off HDMI to save some power
+                    /usr/bin/tvservice -o
+                insertbefore: "exit 0"
+                marker: "# {mark} ANSIBLE BLOCK: HDMI Power"
+            when: not desktop_exists.stat.exists
+
+        -   name: Create file needed for booting to CLI
+            become: true
+            ansible.builtin.file:
+                path: /etc/systemd/system/getty@tty1.service.d/
+                recurse: true
+                state: touch
+            when: desktop_exists.stat.exists
+
+        -   name: Set boot to CLI
+            become: true
+            ansible.builtin.copy:
+                src: "{{ setup_files }}/autologin.conf"
+                dest: /etc/systemd/system/getty@tty1.service.d/
+            when: desktop_exists.stat.exists
 
     # metriful sensor block
     -   name: Download metriful sensor package
@@ -684,10 +734,21 @@
 
         -   name: Unzip ngrok installer
             ansible.builtin.unarchive:
-                src: "{{ software_files }}/ngrok.zip"
+                src: "{{ software_files }}/ngrok-arm64.tgz"
                 dest: "{{ home_path }}/ngrok"
                 remote_src: no
-            when: not ngrok_installed.stat.exists
+            when: |
+                not ngrok_installed.stat.exists
+                and ansible_hostname == "pi4"
+
+        -   name: Unzip ngrok installer
+            ansible.builtin.unarchive:
+                src: "{{ software_files }}/ngrok-arm.tgz"
+                dest: "{{ home_path }}/ngrok"
+                remote_src: no
+            when: |
+                not ngrok_installed.stat.exists
+                and ansible_hostname == "picade"
 
         -   name: Add auth token
             ansible.builtin.shell:
@@ -699,7 +760,7 @@
             ansible.builtin.shell:
                 chdir: "{{ home_path }}/ngrok"
                 cmd: "./ngrok update"
-        when: ansible_hostname == "pi4"
+        when: ansible_hostname == "pi4" or ansible_hostname == "picade"
 
     -   name: RabbitMQ block
         block:
@@ -746,23 +807,24 @@
                 clone: true
                 repo: "git@github.com:amorphousWaste/twitch_bot.git"
 
-        -   name: Download Carrot (RabbitMQ Tests) repo
-            ansible.builtin.git:
-                dest: "{{ github_path }}/carrot"
-                clone: true
-                repo: "git@github.com:amorphousWaste/carrot.git"
+        # -   name: Download Carrot (RabbitMQ Tests) repo
+        #     ansible.builtin.git:
+        #         dest: "{{ github_path }}/carrot"
+        #         clone: true
+        #         repo: "git@github.com:amorphousWaste/carrot.git"
 
-        -   name: Download Books DB Tutorial repo
-            ansible.builtin.git:
-                dest: "{{ github_path }}/BooksDB"
-                clone: true
-                repo: "git@github.com:amorphousWaste/BooksDB.git"
+        # -   name: Download Books DB Tutorial repo
+        #     ansible.builtin.git:
+        #         dest: "{{ github_path }}/BooksDB"
+        #         clone: true
+        #         repo: "git@github.com:amorphousWaste/BooksDB.git"
 
-        -   name: Download Microblog Tutorial repo
-            ansible.builtin.git:
-                dest: "{{ github_path }}/Microblog"
-                clone: true
-                repo: "git@github.com:amorphousWaste/Microblog.git"
+        # -   name: Download Microblog Tutorial repo
+        #     ansible.builtin.git:
+        #         dest: "{{ github_path }}/Microblog"
+        #         clone: true
+        #         repo: "git@github.com:amorphousWaste/Microblog.git"
+        when: ansible_hostname == "pi4"
 
     -   name: Jupyter server block
         block:
@@ -897,6 +959,7 @@
             ansible.builtin.get_url:
                 url: "https://github.com/prometheus/node_exporter/releases/download/v{{ prometheus_node_version }}/node_exporter-{{ prometheus_node_build_armv7 }}.tar.gz"
                 dest: "{{ prometheus_node_download_path }}"
+            register: prometheus_node_downloaded
             when: |
                 not prometheus_node_exists.stat.exists
                 and ansible_hostname in groups.armv7
@@ -905,6 +968,7 @@
             ansible.builtin.get_url:
                 url: "https://github.com/prometheus/node_exporter/releases/download/v{{ prometheus_node_version }}/node_exporter-{{ prometheus_node_build_armv6 }}.tar.gz"
                 dest: "{{ prometheus_node_download_path }}"
+            register: prometheus_node_downloaded
             when: |
                 not prometheus_node_exists.stat.exists
                 and ansible_hostname in groups.armv6
@@ -916,13 +980,13 @@
                 dest: /opt/node-exporter
                 remote_src: yes
                 extra_opts: [--strip-components=1]
-            when: not prometheus_node_exists.stat.exists
+            when: not prometheus_node_downloaded
 
         -   name: Remove Prometheus Node archive
             ansible.builtin.file:
                 path: "{{ prometheus_node_download_path }}"
                 state: absent
-            when: not prometheus_node_exists.stat.exists
+            when: not prometheus_node_downloaded
 
         -   name: Copy Prometheus Node service file
             become: true
@@ -1021,8 +1085,8 @@
                 src: ""
                 dest: "{{ retropie_home }}"
                 state: link
-            when: ansible_hostname == "picade"
-        when: ansible_hostname == "picade"
+        when: ansible_hostname == "fakename"
+        # when: ansible_hostname == "picade"
 
     -   name: Final reboot
         become: true
