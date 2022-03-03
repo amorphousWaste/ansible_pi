@@ -14,16 +14,17 @@ apt_packages:
 -   nodejs
 -   npm
 -   p7zip-full
--   python-apt
--   python-fontforge
--   python-pip
--   python-setuptools
 -   python3
+-   python3-apt
+-   python3-fontforge
+-   python3-pip
+-   python3-setuptools
 -   python3-pip
 -   python3-pyqt5
 -   python3-rpi.gpio
 -   python3-setuptools
 -   python3-smbus
+-   python3-venv
 -   software-properties-common
 -   tree
 -   unzip
@@ -31,65 +32,52 @@ apt_packages:
 -   uuid-runtime
 -   zsh
 
+picade_packages:
+-   bchunk
+-   kivy
+-   xboxdrv
+
 pip_packages_preinstall:
 -   setuptools
 -   wheel
 
-pip_packages:
--   Flask
--   Pillow
+universal_pip_packages:
 -   PyYAML
 -   aiofiles
 -   aiohttp
 -   aiosqlite
 -   black
--   cookiecutter
--   curio
--   cython
--   discord
--   flask-bootstrap
--   flask-login
--   flask-mail
--   flask-moment
--   flask-restful
--   flask-sqlalchemy
--   flask-wtf
 -   gpiozero
--   irc
 -   ipython
--   jinja2
--   jupyterlab
--   kivy
--   pika
 -   pip
 -   pipenv
 -   pipreqs
+-   python-dotenv
+-   requests
+-   urllib3
+-   websockets
+-   pyzmq
+
+pi4_pip_packages:
+-   Flask[async]
+-   Pillow
+-   cookiecutter
+-   cryptography
+-   curio
+-   cython
+-   dearpygui
+-   discord
+-   jupyterlab
+-   matplotlib
 -   psutil
+-   pygame
 -   pygount
--   pyjwt
 -   pylama
--   pyqtgraph
 -   pyserial
 -   pytest
 -   pytest-cov
--   python-dotenv
--   rabbitmq
 -   radon
--   requests
 -   rx
--   setuptools
--   sqlalchemy
--   twitchio
--   urllib3
--   websockets
--   wheel
-
-pip_packages_non_pi0:
--   dearpygui
-
-picade_packages:
--   bchunk
--   xboxdrv
 
 user_folders:
 -   .backup
@@ -136,6 +124,8 @@ micro_plugins:
 -   quoter
 -   wc
 
+python_version: 3.9
+
 nodejs_version: 14
 prometheus_version: 2.28.1
 prometheus_build: "{{ prometheus_version }}.linux-armv7"
@@ -161,7 +151,7 @@ jupyter_path: "{{ home_path }}/.jupyter"
 motd_update_scripts: /etc/update-motd.d
 ngrok_path: "{{ home_path }}/ngrok"
 oh_my_zsh_path: "{{ home_path }}/.oh-my-zsh"
-pip_packages_path: "{{ home_path }}/.local/lib/python3.7/site-packages"
+pip_packages_path: "{{ home_path }}/.local/lib/python{{ python_version }}/site-packages"
 profile_path: /etc/profile
 prometheus_download_path: "{{ downloads_path }}/prometheus-{{ prometheus_build }}.tar.gz"
 prometheus_node_download_path: "{{ downloads_path }}/prometheus-nodeexporter"
