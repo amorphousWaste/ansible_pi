@@ -28,3 +28,6 @@ The existence of this file enables ssh by default.
 
 ## wpa_supplicant ##
 This file defines the wifi connection(s).
+
+**Pi0** -> **Pi3 B** Require a 2.4GHz wifi connection.
+**Pi3 B+** -> **Pi4** Can use a 5GHz wifi connection.
