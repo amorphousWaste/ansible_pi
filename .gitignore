@@ -140,3 +140,4 @@ setup_files/jupyter_files/jupytercert.*
 *.zip
 *.otf
 *.img
+*.tgz
